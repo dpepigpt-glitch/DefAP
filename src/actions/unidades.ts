@@ -1,0 +1,167 @@
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+
+export async function createUnidade(formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const nome = formData.get('nome') as string
+  if (!nome?.trim()) return { error: 'Nome da unidade é obrigatório.' }
+
+  const { data, error } = await supabase
+    .from('unidades')
+    .insert({ nome: nome.trim(), defensor_id: user.id })
+    .select()
+    .single()
+
+  if (error) return { error: 'Erro ao criar unidade.' }
+
+  revalidatePath('/unidades')
+  redirect(`/unidades/${data.id}`)
+}
+
+export async function updateUnidade(unidadeId: string, formData: FormData) {
+  const supabase = await createClient()
+  const nome = formData.get('nome') as string
+  if (!nome?.trim()) return { error: 'Nome é obrigatório.' }
+
+  const { error } = await supabase
+    .from('unidades')
+    .update({ nome: nome.trim() })
+    .eq('id', unidadeId)
+
+  if (error) return { error: 'Erro ao atualizar unidade.' }
+
+  revalidatePath('/unidades')
+  return { success: true }
+}
+
+export async function addMembro(unidadeId: string, email: string) {
+  const supabase = await createClient()
+
+  // Find profile by email
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id, full_name, email')
+    .eq('email', email.toLowerCase().trim())
+    .single()
+
+  if (profileError || !profile) {
+    return { error: 'Nenhum usuário encontrado com este e-mail.' }
+  }
+
+  const { error } = await supabase
+    .from('unidade_membros')
+    .insert({ unidade_id: unidadeId, profile_id: profile.id })
+
+  if (error) {
+    if (error.code === '23505') return { error: 'Este executor já é membro desta unidade.' }
+    return { error: 'Erro ao adicionar membro.' }
+  }
+
+  revalidatePath(`/unidades/${unidadeId}/configuracoes`)
+  return { success: true, member: profile }
+}
+
+export async function removeMembro(unidadeId: string, profileId: string) {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('unidade_membros')
+    .delete()
+    .eq('unidade_id', unidadeId)
+    .eq('profile_id', profileId)
+
+  if (error) return { error: 'Erro ao remover membro.' }
+
+  revalidatePath(`/unidades/${unidadeId}/configuracoes`)
+  return { success: true }
+}
+
+export async function createTipoTarefa(unidadeId: string, nome: string) {
+  const supabase = await createClient()
+  if (!nome?.trim()) return { error: 'Nome é obrigatório.' }
+
+  const { error } = await supabase
+    .from('tipos_tarefa')
+    .insert({ unidade_id: unidadeId, nome: nome.trim() })
+
+  if (error) return { error: 'Erro ao criar tipo de tarefa.' }
+
+  revalidatePath(`/unidades/${unidadeId}/configuracoes`)
+  return { success: true }
+}
+
+export async function updateTipoTarefa(tipoId: string, unidadeId: string, nome: string, ativo: boolean) {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('tipos_tarefa')
+    .update({ nome: nome.trim(), ativo })
+    .eq('id', tipoId)
+
+  if (error) return { error: 'Erro ao atualizar tipo de tarefa.' }
+
+  revalidatePath(`/unidades/${unidadeId}/configuracoes`)
+  return { success: true }
+}
+
+export async function createColunaCustomizada(
+  unidadeId: string,
+  data: { nome: string; tipo: string; opcoes?: string; obrigatorio: boolean; ordem: number }
+) {
+  const supabase = await createClient()
+  if (!data.nome?.trim()) return { error: 'Nome da coluna é obrigatório.' }
+
+  const opcoesParsed = data.tipo === 'lista' && data.opcoes
+    ? data.opcoes.split('\n').map((o) => o.trim()).filter(Boolean)
+    : null
+
+  const { error } = await supabase
+    .from('colunas_customizadas')
+    .insert({
+      unidade_id: unidadeId,
+      nome: data.nome.trim(),
+      tipo: data.tipo,
+      opcoes: opcoesParsed,
+      obrigatorio: data.obrigatorio,
+      ordem: data.ordem,
+    })
+
+  if (error) return { error: 'Erro ao criar coluna.' }
+
+  revalidatePath(`/unidades/${unidadeId}/configuracoes`)
+  return { success: true }
+}
+
+export async function updateColunaCustomizada(
+  colunaId: string,
+  unidadeId: string,
+  data: { nome: string; ativo: boolean; obrigatorio: boolean; opcoes?: string; ordem: number }
+) {
+  const supabase = await createClient()
+
+  const opcoesParsed = data.opcoes
+    ? data.opcoes.split('\n').map((o) => o.trim()).filter(Boolean)
+    : null
+
+  const { error } = await supabase
+    .from('colunas_customizadas')
+    .update({
+      nome: data.nome.trim(),
+      ativo: data.ativo,
+      obrigatorio: data.obrigatorio,
+      opcoes: opcoesParsed,
+      ordem: data.ordem,
+    })
+    .eq('id', colunaId)
+
+  if (error) return { error: 'Erro ao atualizar coluna.' }
+
+  revalidatePath(`/unidades/${unidadeId}/configuracoes`)
+  return { success: true }
+}
