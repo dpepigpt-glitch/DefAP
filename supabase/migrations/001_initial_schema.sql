@@ -165,15 +165,34 @@ create trigger unidades_updated_at
 
 -- Auto-create profile on auth.user creation
 create or replace function public.handle_new_user()
-returns trigger language plpgsql security definer as $$
+returns trigger language plpgsql security definer
+set search_path = public
+as $$
+declare
+  v_role user_role := 'executor';
+  v_email text;
+  v_full_name text;
 begin
-  insert into public.profiles (id, full_name, email, role)
-  values (
-    new.id,
-    coalesce(new.raw_user_meta_data->>'full_name', new.email),
-    new.email,
-    coalesce((new.raw_user_meta_data->>'role')::user_role, 'executor')
+  v_email := coalesce(new.email, '');
+
+  v_full_name := coalesce(
+    nullif(trim(new.raw_user_meta_data->>'full_name'), ''),
+    nullif(split_part(v_email, '@', 1), ''),
+    'Usuário'
   );
+
+  begin
+    if new.raw_user_meta_data->>'role' is not null then
+      v_role := (new.raw_user_meta_data->>'role')::user_role;
+    end if;
+  exception when others then
+    v_role := 'executor';
+  end;
+
+  insert into public.profiles (id, full_name, email, role)
+  values (new.id, v_full_name, v_email, v_role)
+  on conflict (id) do nothing;
+
   return new;
 end;
 $$;
