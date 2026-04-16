@@ -53,7 +53,14 @@ export default async function HistoricoPage({ params }: PageProps) {
 
   if (!unidade) redirect('/unidades')
 
-  const { data: logs } = await supabase
+  const { data: tarefaIds } = await supabase
+    .from('tarefas')
+    .select('id')
+    .eq('unidade_id', unidadeId)
+
+  const ids = (tarefaIds ?? []).map((t) => t.id)
+
+  const { data: logs } = ids.length === 0 ? { data: [] } : await supabase
     .from('tarefa_logs')
     .select(`
       id,
@@ -68,10 +75,7 @@ export default async function HistoricoPage({ params }: PageProps) {
       changer:profiles!tarefa_logs_changed_by_fkey(full_name, email)
     `)
     .eq('tipo_alteracao', 'edicao')
-    .in(
-      'tarefa_id',
-      supabase.from('tarefas').select('id').eq('unidade_id', unidadeId)
-    )
+    .in('tarefa_id', ids)
     .order('created_at', { ascending: false })
     .limit(200)
 
