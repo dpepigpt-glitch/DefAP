@@ -1,13 +1,18 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-// Routes that require Defensor role
+// Routes only defensor can access (gestor and executor are blocked)
 const DEFENSOR_ONLY_PATTERNS = [
   /^\/unidades\/nova$/,
+  /^\/unidades\/[^/]+\/configuracoes/,
+  /^\/unidades\/[^/]+\/relatorios/,
+]
+
+// Routes that require at least gestor (executor is blocked)
+const EXECUTOR_BLOCKED_PATTERNS = [
   /^\/unidades\/[^/]+\/tarefas\/nova$/,
   /^\/unidades\/[^/]+\/tarefas\/[^/]+\/editar$/,
   /^\/unidades\/[^/]+\/importar$/,
-  /^\/unidades\/[^/]+\/configuracoes/,
 ]
 
 export async function middleware(request: NextRequest) {
@@ -70,19 +75,22 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Check if current path is Defensor-only
-  const isDefensorOnly = DEFENSOR_ONLY_PATTERNS.some((pattern) =>
-    pattern.test(pathname)
-  )
+  const role = user.user_metadata?.role ?? 'executor'
 
-  if (isDefensorOnly) {
-    // Get user role from metadata (fast — no DB query)
-    const role = user.user_metadata?.role ?? 'executor'
-    if (role !== 'defensor') {
-      const url = request.nextUrl.clone()
-      url.pathname = '/unidades'
-      return NextResponse.redirect(url)
-    }
+  // Defensor-only routes: block gestor and executor
+  const isDefensorOnly = DEFENSOR_ONLY_PATTERNS.some((p) => p.test(pathname))
+  if (isDefensorOnly && role !== 'defensor') {
+    const url = request.nextUrl.clone()
+    url.pathname = '/unidades'
+    return NextResponse.redirect(url)
+  }
+
+  // Task creation/edit routes: block executor (allow defensor + gestor)
+  const isExecutorBlocked = EXECUTOR_BLOCKED_PATTERNS.some((p) => p.test(pathname))
+  if (isExecutorBlocked && role === 'executor') {
+    const url = request.nextUrl.clone()
+    url.pathname = '/unidades'
+    return NextResponse.redirect(url)
   }
 
   return supabaseResponse

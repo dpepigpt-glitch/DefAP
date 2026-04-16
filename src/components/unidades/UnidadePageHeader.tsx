@@ -6,7 +6,7 @@ import { AlertTriangle, Clock, CheckCircle2, Send, Building2 } from 'lucide-reac
 
 interface UnidadePageHeaderProps {
   unidade: Unidade
-  role?: 'defensor' | 'executor'
+  role?: 'defensor' | 'gestor' | 'executor'
   tarefas: Tarefa[]
 }
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function createUnidade(formData: FormData) {
   const supabase = await createClient()
@@ -40,13 +41,17 @@ export async function updateUnidade(unidadeId: string, formData: FormData) {
   return { success: true }
 }
 
-export async function addMembro(unidadeId: string, email: string) {
+export async function addMembro(
+  unidadeId: string,
+  email: string,
+  papel: 'executor' | 'gestor' = 'executor'
+) {
   const supabase = await createClient()
 
   // Find profile by email
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('id, full_name, email')
+    .select('id, full_name, email, role')
     .eq('email', email.toLowerCase().trim())
     .single()
 
@@ -56,15 +61,26 @@ export async function addMembro(unidadeId: string, email: string) {
 
   const { error } = await supabase
     .from('unidade_membros')
-    .insert({ unidade_id: unidadeId, profile_id: profile.id })
+    .insert({ unidade_id: unidadeId, profile_id: profile.id, papel })
 
   if (error) {
-    if (error.code === '23505') return { error: 'Este executor já é membro desta unidade.' }
+    if (error.code === '23505') return { error: 'Este usuário já é membro desta unidade.' }
     return { error: 'Erro ao adicionar membro.' }
   }
 
+  // If adding as gestor, promote the user's global role
+  if (papel === 'gestor' && profile.role !== 'gestor' && profile.role !== 'defensor') {
+    const admin = createAdminClient()
+    await Promise.all([
+      supabase.from('profiles').update({ role: 'gestor' }).eq('id', profile.id),
+      admin.auth.admin.updateUserById(profile.id, {
+        user_metadata: { role: 'gestor' },
+      }),
+    ])
+  }
+
   revalidatePath(`/unidades/${unidadeId}/configuracoes`)
-  return { success: true, member: profile }
+  return { success: true, member: { ...profile, papel } }
 }
 
 export async function removeMembro(unidadeId: string, profileId: string) {

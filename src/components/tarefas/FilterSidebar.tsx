@@ -6,7 +6,7 @@ import { Filter } from 'lucide-react'
 interface FilterSidebarProps {
   tiposTarefa: TipoTarefa[]
   executores: Profile[]
-  userRole: 'defensor' | 'executor'
+  userRole: 'defensor' | 'gestor' | 'executor'
 }
 
 const STATUS_OPTIONS = [
@@ -74,8 +74,8 @@ export function FilterSidebar({ tiposTarefa, executores, userRole }: FilterSideb
         </div>
       )}
 
-      {/* Executor filter (defensor only) */}
-      {userRole === 'defensor' && executores.length > 0 && (
+      {/* Executor filter (defensor and gestor) */}
+      {(userRole === 'defensor' || userRole === 'gestor') && executores.length > 0 && (
         <div>
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
             Executor

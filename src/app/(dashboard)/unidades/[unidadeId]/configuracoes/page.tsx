@@ -6,7 +6,7 @@ import { ColunasManager } from '@/components/configuracoes/ColunasManager'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Settings } from 'lucide-react'
-import type { TipoTarefa, ColunaCustomizada, Profile } from '@/types'
+import type { TipoTarefa, ColunaCustomizada, UnidadeMembro } from '@/types'
 
 interface PageProps {
   params: { unidadeId: string }
@@ -22,12 +22,15 @@ export default async function ConfiguracoesPage({ params }: PageProps) {
     supabase.from('unidades').select('*').eq('id', unidadeId).single(),
     supabase.from('tipos_tarefa').select('*').eq('unidade_id', unidadeId).order('nome'),
     supabase.from('colunas_customizadas').select('*').eq('unidade_id', unidadeId).order('ordem'),
-    supabase.from('unidade_membros').select('profile:profiles(id, full_name, email)').eq('unidade_id', unidadeId),
+    supabase
+      .from('unidade_membros')
+      .select('id, profile_id, unidade_id, papel, created_at, profile:profiles(id, full_name, email, role)')
+      .eq('unidade_id', unidadeId),
   ])
 
   if (!unidadeResult.data) redirect('/unidades')
 
-  const executores = membrosResult.data?.map((m: any) => m.profile).filter(Boolean) ?? []
+  const membros = (membrosResult.data ?? []) as unknown as UnidadeMembro[]
 
   return (
     <div className="max-w-3xl space-y-8">
@@ -49,7 +52,7 @@ export default async function ConfiguracoesPage({ params }: PageProps) {
 
       <ExecutoresManager
         unidadeId={unidadeId}
-        executores={executores as Profile[]}
+        membros={membros}
       />
 
       <TiposTarefaManager

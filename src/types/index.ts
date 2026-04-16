@@ -1,6 +1,6 @@
 // SGP-D Domain Types
 
-export type UserRole = 'defensor' | 'executor'
+export type UserRole = 'defensor' | 'gestor' | 'executor'
 export type TarefaStatus = 'pendente' | 'remetido_ao_defensor' | 'protocolado'
 export type ColunaTipo = 'texto' | 'numero' | 'data' | 'lista'
 export type SeloTipo = 'flamengo' | 'diamante' | 'ouro' | 'prata' | 'bronze' | null
@@ -27,6 +27,7 @@ export interface UnidadeMembro {
   id: string
   unidade_id: string
   profile_id: string
+  papel: 'executor' | 'gestor'
   created_at: string
   profile?: Profile
 }

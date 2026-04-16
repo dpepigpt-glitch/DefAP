@@ -35,7 +35,7 @@ interface TarefasDataTableProps {
   tarefas: Tarefa[]
   colunas: ColunaCustomizada[]
   unidadeId: string
-  userRole: 'defensor' | 'executor'
+  userRole: 'defensor' | 'gestor' | 'executor'
   currentUserId: string
   globalFilter?: string
   columnFilters?: ColumnFiltersState
@@ -105,6 +105,7 @@ export function TarefasDataTable({
     if (userRole === 'executor') {
       await executorSubmitTarefa(tarefa.id, unidadeId)
     } else {
+      // defensor and gestor use the same status update
       await updateTarefaStatus(tarefa.id, newStatus, unidadeId)
     }
     setLoadingIds((prev) => {
@@ -236,8 +237,13 @@ export function TarefasDataTable({
         const tarefa = row.original
         const isLoading = loadingIds.has(tarefa.id)
         const isOwnTask = tarefa.executor_id === currentUserId
-        const canEditStatus =
-          userRole === 'defensor' || (userRole === 'executor' && isOwnTask)
+        const canEdit = userRole === 'defensor' || userRole === 'gestor'
+        const canDelete = userRole === 'defensor'
+        const canProtocolar = userRole === 'defensor'
+        const canRemeter =
+          userRole === 'defensor' ||
+          userRole === 'gestor' ||
+          (userRole === 'executor' && isOwnTask)
 
         return (
           <DropdownMenu>
@@ -253,7 +259,7 @@ export function TarefasDataTable({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
-              {userRole === 'defensor' && (
+              {canEdit && (
                 <>
                   <DropdownMenuItem asChild>
                     <Link
@@ -268,7 +274,7 @@ export function TarefasDataTable({
                 </>
               )}
 
-              {canEditStatus && tarefa.status === 'pendente' && (
+              {canRemeter && tarefa.status === 'pendente' && (
                 <DropdownMenuItem
                   onClick={() => handleStatusChange(tarefa, 'remetido_ao_defensor')}
                   className="text-blue-700 focus:text-blue-700"
@@ -278,7 +284,7 @@ export function TarefasDataTable({
                 </DropdownMenuItem>
               )}
 
-              {userRole === 'defensor' && tarefa.status === 'remetido_ao_defensor' && (
+              {canProtocolar && tarefa.status === 'remetido_ao_defensor' && (
                 <DropdownMenuItem
                   onClick={() => handleStatusChange(tarefa, 'protocolado')}
                   className="text-gray-700 focus:text-gray-700"
@@ -288,7 +294,7 @@ export function TarefasDataTable({
                 </DropdownMenuItem>
               )}
 
-              {userRole === 'defensor' && (
+              {canDelete && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem

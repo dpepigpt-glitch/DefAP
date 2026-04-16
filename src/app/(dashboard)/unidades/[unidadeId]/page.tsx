@@ -18,7 +18,7 @@ export default async function UnidadePage({ params }: PageProps) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const role = (user.user_metadata?.role ?? 'executor') as 'defensor' | 'executor'
+  const role = (user.user_metadata?.role ?? 'executor') as 'defensor' | 'gestor' | 'executor'
 
   // Fetch unit
   const { data: unidade } = await supabase
@@ -41,7 +41,7 @@ export default async function UnidadePage({ params }: PageProps) {
     .eq('unidade_id', unidadeId)
     .order('prazo_interno', { ascending: true })
 
-  // Executor sees only their own tasks
+  // Executor sees only their own tasks; defensor and gestor see all
   if (role === 'executor') {
     tarefasQuery = tarefasQuery.eq('executor_id', user.id)
   }
@@ -64,9 +64,9 @@ export default async function UnidadePage({ params }: PageProps) {
     .eq('ativo', true)
     .order('nome')
 
-  // Fetch executors for filter (defensor only)
+  // Fetch executors for filter (defensor and gestor see all members)
   let executores: Profile[] = []
-  if (role === 'defensor') {
+  if (role === 'defensor' || role === 'gestor') {
     const { data: membros } = await supabase
       .from('unidade_membros')
       .select('profile:profiles(id, full_name, email)')
@@ -85,7 +85,7 @@ export default async function UnidadePage({ params }: PageProps) {
       />
 
       {/* Action buttons */}
-      {role === 'defensor' && (
+      {(role === 'defensor' || role === 'gestor') && (
         <div className="flex items-center gap-3 flex-wrap">
           <Link href={`/unidades/${unidadeId}/tarefas/nova`}>
             <Button>
@@ -99,12 +99,14 @@ export default async function UnidadePage({ params }: PageProps) {
               Importar CSV/Excel
             </Button>
           </Link>
-          <Link href={`/unidades/${unidadeId}/configuracoes`}>
-            <Button variant="ghost">
-              <Settings className="h-4 w-4 mr-2" />
-              Configurações
-            </Button>
-          </Link>
+          {role === 'defensor' && (
+            <Link href={`/unidades/${unidadeId}/configuracoes`}>
+              <Button variant="ghost">
+                <Settings className="h-4 w-4 mr-2" />
+                Configurações
+              </Button>
+            </Link>
+          )}
         </div>
       )}
 
