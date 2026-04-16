@@ -38,6 +38,41 @@ const COLUMN_MAP: Record<string, string> = {
 
 type ParsedRow = Record<string, string>
 
+// Convert any Excel cell value to DD/MM/YYYY string
+function cellToDateString(val: unknown): string {
+  if (val == null || val === '') return ''
+  // Date object (when cellDates: true)
+  if (val instanceof Date) {
+    const d = String(val.getDate()).padStart(2, '0')
+    const m = String(val.getMonth() + 1).padStart(2, '0')
+    const y = val.getFullYear()
+    return `${d}/${m}/${y}`
+  }
+  const str = String(val).trim()
+  if (!str || str === 'undefined') return ''
+  // Excel serial number → date
+  const serial = Number(str)
+  if (!isNaN(serial) && serial > 25000 && serial < 100000) {
+    const date = new Date(Math.round((serial - 25569) * 86400 * 1000))
+    const d = String(date.getUTCDate()).padStart(2, '0')
+    const m = String(date.getUTCMonth() + 1).padStart(2, '0')
+    const y = date.getUTCFullYear()
+    return `${d}/${m}/${y}`
+  }
+  // Already DD/MM/YYYY
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) return str
+  // YYYY-MM-DD (ISO)
+  const iso = str.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`
+  return str
+}
+
+function cellToString(val: unknown): string {
+  if (val == null) return ''
+  if (val instanceof Date) return cellToDateString(val)
+  return String(val)
+}
+
 export default function ImportarPage() {
   const params = useParams()
   const router = useRouter()
@@ -76,17 +111,17 @@ export default function ImportarPage() {
       } else {
         const XLSX = await import('xlsx')
         const buffer = await file.arrayBuffer()
-        const workbook = XLSX.read(buffer)
+        const workbook = XLSX.read(buffer, { cellDates: true })
         const sheet = workbook.Sheets[workbook.SheetNames[0]]
-        const data = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 }) as string[][]
+        const data = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1 }) as unknown[][]
         if (data.length < 2) return
 
-        const rawHeaders = data[0].map((h) => String(h).toLowerCase().trim())
+        const rawHeaders = (data[0] as unknown[]).map((h) => cellToString(h).toLowerCase().trim())
         setHeaders(rawHeaders)
         rows = data.slice(1).map((row) => {
           const obj: ParsedRow = {}
           rawHeaders.forEach((h, i) => {
-            obj[h] = String(row[i] ?? '')
+            obj[h] = cellToString((row as unknown[])[i])
           })
           return obj
         })
@@ -122,13 +157,13 @@ export default function ImportarPage() {
       } else {
         const XLSX = await import('xlsx')
         const buffer = await file.arrayBuffer()
-        const workbook = XLSX.read(buffer)
+        const workbook = XLSX.read(buffer, { cellDates: true })
         const sheet = workbook.Sheets[workbook.SheetNames[0]]
-        const data = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 }) as string[][]
-        const rawHeaders = data[0].map((h) => String(h).toLowerCase().trim())
+        const data = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1 }) as unknown[][]
+        const rawHeaders = (data[0] as unknown[]).map((h) => cellToString(h).toLowerCase().trim())
         allRows = data.slice(1).map((row) => {
           const obj: ParsedRow = {}
-          rawHeaders.forEach((h, i) => { obj[h] = String(row[i] ?? '') })
+          rawHeaders.forEach((h, i) => { obj[h] = cellToString((row as unknown[])[i]) })
           return obj
         })
       }
