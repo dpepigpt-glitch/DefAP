@@ -59,6 +59,8 @@ export interface Tarefa {
   assistido: string
   data_intimacao: string
   tipo_tarefa_id: string | null
+  inicio: string | null           // start date for prazo counting
+  prazo_dias: number | null       // workdays
   prazo_final_pje: string
   prazo_interno: string           // ISO datetime string
   executor_id: string | null
@@ -131,6 +133,28 @@ export interface ColunaFormValues {
   tipo: ColunaTipo
   opcoes?: string
   obrigatorio: boolean
+}
+
+// Custom field label override per unit
+export interface CampoLabel {
+  id: string
+  unidade_id: string
+  campo: string
+  label: string
+}
+
+// Default display labels for fixed fields
+export const CAMPO_DEFAULTS: Record<string, string> = {
+  numero_processo: 'Nº Processo',
+  assistido: 'Assistido',
+  data_intimacao: 'Data do Ciente',
+  inicio: 'Início',
+  prazo_dias: 'Prazo (dias)',
+  prazo_final_pje: 'Final do Prazo',
+  prazo_interno: 'Prazo Interno',
+  executor: 'Responsável',
+  tipo_tarefa: 'Petição',
+  status: 'Protocolo',
 }
 
 // Report types

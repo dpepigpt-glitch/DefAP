@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,8 +11,9 @@ import { createTarefa, updateTarefa, type TarefaPayload } from '@/actions/tarefa
 import { maskProcesso } from '@/lib/utils/processoMask'
 import { maskDate, dateToISO, isoToDisplay } from '@/lib/utils/dateMask'
 import { toTitleCase } from '@/lib/utils/titleCase'
-import { Loader2, ArrowLeft } from 'lucide-react'
-import type { Tarefa, TipoTarefa, Profile, ColunaCustomizada } from '@/types'
+import { calcPrazoFinal } from '@/lib/utils/workdays'
+import { Loader2, ArrowLeft, CalendarCheck } from 'lucide-react'
+import type { Tarefa, TipoTarefa, Profile, ColunaCustomizada, CampoLabel, CAMPO_DEFAULTS } from '@/types'
 import Link from 'next/link'
 
 interface TarefaFormProps {
@@ -20,7 +21,13 @@ interface TarefaFormProps {
   tiposTarefa: TipoTarefa[]
   executores: Profile[]
   colunas: ColunaCustomizada[]
-  tarefa?: Tarefa  // If provided, edit mode
+  tarefa?: Tarefa
+  campoLabels?: CampoLabel[]
+  isOverdue?: boolean
+}
+
+function useLabel(campoLabels: CampoLabel[] | undefined, campo: string, defaultLabel: string) {
+  return campoLabels?.find((cl) => cl.campo === campo)?.label ?? defaultLabel
 }
 
 export function TarefaForm({
@@ -29,6 +36,8 @@ export function TarefaForm({
   executores,
   colunas,
   tarefa,
+  campoLabels,
+  isOverdue = false,
 }: TarefaFormProps) {
   const router = useRouter()
   const isEdit = !!tarefa
@@ -40,6 +49,8 @@ export function TarefaForm({
     assistido: tarefa?.assistido ?? '',
     data_intimacao: tarefa ? isoToDisplay(tarefa.data_intimacao) : '',
     tipo_tarefa_id: tarefa?.tipo_tarefa_id ?? '',
+    inicio: tarefa?.inicio ? isoToDisplay(tarefa.inicio) : '',
+    prazo_dias: tarefa?.prazo_dias ? String(tarefa.prazo_dias) : '',
     prazo_final_pje: tarefa ? isoToDisplay(tarefa.prazo_final_pje) : '',
     prazo_interno: tarefa ? isoToDisplay(tarefa.prazo_interno.split('T')[0]) : '',
     executor_id: tarefa?.executor_id ?? '',
@@ -52,27 +63,37 @@ export function TarefaForm({
     ) ?? {}
   )
 
+  // Auto-calculate prazo_final_pje when inicio or prazo_dias changes
+  useEffect(() => {
+    const dias = parseInt(formData.prazo_dias, 10)
+    if (formData.inicio && dias > 0) {
+      const calc = calcPrazoFinal(formData.inicio, dias)
+      if (calc) {
+        setFormData((prev) => ({ ...prev, prazo_final_pje: calc }))
+        // Also pre-fill prazo_interno if still empty
+        setFormData((prev) => ({
+          ...prev,
+          prazo_final_pje: calc,
+          prazo_interno: prev.prazo_interno || calc,
+        }))
+      }
+    }
+  }, [formData.inicio, formData.prazo_dias])
+
   function handleProcessoInput(e: React.ChangeEvent<HTMLInputElement>) {
-    setFormData((prev) => ({
-      ...prev,
-      numero_processo: maskProcesso(e.target.value),
-    }))
+    setFormData((prev) => ({ ...prev, numero_processo: maskProcesso(e.target.value) }))
   }
 
   function handleDateInput(field: keyof typeof formData) {
     return (e: React.ChangeEvent<HTMLInputElement>) => {
-      setFormData((prev) => ({
-        ...prev,
-        [field]: maskDate(e.target.value),
-      }))
+      setFormData((prev) => ({ ...prev, [field]: maskDate(e.target.value) }))
     }
   }
 
-  function handleAssistidoBlur() {
-    setFormData((prev) => ({
-      ...prev,
-      assistido: toTitleCase(prev.assistido),
-    }))
+  function handleTextBlur(field: keyof typeof formData) {
+    return () => {
+      setFormData((prev) => ({ ...prev, [field]: toTitleCase(prev[field]) }))
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -85,6 +106,8 @@ export function TarefaForm({
       numero_processo: formData.numero_processo,
       assistido: formData.assistido,
       data_intimacao: dateToISO(formData.data_intimacao),
+      inicio: formData.inicio ? dateToISO(formData.inicio) : undefined,
+      prazo_dias: formData.prazo_dias ? parseInt(formData.prazo_dias, 10) : undefined,
       tipo_tarefa_id: formData.tipo_tarefa_id || undefined,
       prazo_final_pje: dateToISO(formData.prazo_final_pje),
       prazo_interno: dateToISO(formData.prazo_interno) + 'T17:00:00',
@@ -109,6 +132,8 @@ export function TarefaForm({
     router.refresh()
   }
 
+  const lbl = (campo: string, def: string) => useLabel(campoLabels, campo, def)
+
   return (
     <div className="max-w-2xl space-y-6">
       <div className="flex items-center gap-3">
@@ -123,6 +148,12 @@ export function TarefaForm({
         </h1>
       </div>
 
+      {isOverdue && (
+        <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md p-3">
+          Esta tarefa está <strong>vencida</strong>. Apenas o Defensor pode editá-la.
+        </div>
+      )}
+
       <form onSubmit={handleSubmit}>
         <Card>
           <CardHeader>
@@ -131,7 +162,7 @@ export function TarefaForm({
           <CardContent className="space-y-4">
             {/* Número do Processo */}
             <div className="space-y-2">
-              <Label htmlFor="numero_processo">Número do Processo *</Label>
+              <Label htmlFor="numero_processo">{lbl('numero_processo', 'Nº Processo')} *</Label>
               <Input
                 id="numero_processo"
                 value={formData.numero_processo}
@@ -145,21 +176,20 @@ export function TarefaForm({
 
             {/* Assistido */}
             <div className="space-y-2">
-              <Label htmlFor="assistido">Assistido *</Label>
+              <Label htmlFor="assistido">{lbl('assistido', 'Assistido')} *</Label>
               <Input
                 id="assistido"
                 value={formData.assistido}
                 onChange={(e) => setFormData((p) => ({ ...p, assistido: e.target.value }))}
-                onBlur={handleAssistidoBlur}
+                onBlur={handleTextBlur('assistido')}
                 placeholder="Nome do assistido"
                 required
               />
-              <p className="text-xs text-gray-400">Será convertido automaticamente para Title Case</p>
             </div>
 
-            {/* Data Intimação */}
+            {/* Data do Ciente */}
             <div className="space-y-2">
-              <Label htmlFor="data_intimacao">Data da Intimação *</Label>
+              <Label htmlFor="data_intimacao">{lbl('data_intimacao', 'Data do Ciente')} *</Label>
               <Input
                 id="data_intimacao"
                 value={formData.data_intimacao}
@@ -169,9 +199,9 @@ export function TarefaForm({
               />
             </div>
 
-            {/* Tipo de Tarefa */}
+            {/* Tipo de Petição */}
             <div className="space-y-2">
-              <Label htmlFor="tipo_tarefa_id">Tipo de Petição</Label>
+              <Label htmlFor="tipo_tarefa_id">{lbl('tipo_tarefa', 'Petição')}</Label>
               <Select
                 value={formData.tipo_tarefa_id}
                 onValueChange={(v) => setFormData((p) => ({ ...p, tipo_tarefa_id: v }))}
@@ -196,21 +226,60 @@ export function TarefaForm({
             <CardTitle className="text-base">Prazos e Atribuição</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Prazo Final PJE */}
+            {/* Início */}
             <div className="space-y-2">
-              <Label htmlFor="prazo_final_pje">Prazo Final PJE *</Label>
+              <Label htmlFor="inicio">{lbl('inicio', 'Início')}</Label>
+              <Input
+                id="inicio"
+                value={formData.inicio}
+                onChange={handleDateInput('inicio')}
+                placeholder="00/00/0000"
+              />
+              <p className="text-xs text-gray-400">Data de início para contagem do prazo</p>
+            </div>
+
+            {/* Prazo (dias) */}
+            <div className="space-y-2">
+              <Label htmlFor="prazo_dias">{lbl('prazo_dias', 'Prazo (dias)')}</Label>
+              <Input
+                id="prazo_dias"
+                type="number"
+                min={1}
+                max={365}
+                value={formData.prazo_dias}
+                onChange={(e) => setFormData((p) => ({ ...p, prazo_dias: e.target.value }))}
+                placeholder="Ex: 5"
+              />
+              <p className="text-xs text-gray-400">Dias úteis — inclui o dia de Início</p>
+            </div>
+
+            {/* Final do Prazo (auto-calculado) */}
+            <div className="space-y-2">
+              <Label htmlFor="prazo_final_pje" className="flex items-center gap-2">
+                {lbl('prazo_final_pje', 'Final do Prazo')} *
+                {formData.inicio && formData.prazo_dias && (
+                  <span className="text-xs text-blue-600 font-normal flex items-center gap-1">
+                    <CalendarCheck className="h-3 w-3" />
+                    calculado automaticamente
+                  </span>
+                )}
+              </Label>
               <Input
                 id="prazo_final_pje"
                 value={formData.prazo_final_pje}
                 onChange={handleDateInput('prazo_final_pje')}
                 placeholder="00/00/0000"
                 required
+                className={formData.inicio && formData.prazo_dias ? 'bg-blue-50 border-blue-200' : ''}
               />
+              <p className="text-xs text-gray-400">
+                Calculado a partir de Início + Prazo (dias úteis, sem sábado, domingo ou feriados)
+              </p>
             </div>
 
             {/* Prazo Interno */}
             <div className="space-y-2">
-              <Label htmlFor="prazo_interno">Prazo Interno *</Label>
+              <Label htmlFor="prazo_interno">{lbl('prazo_interno', 'Prazo Interno')} *</Label>
               <Input
                 id="prazo_interno"
                 value={formData.prazo_interno}
@@ -223,15 +292,15 @@ export function TarefaForm({
               </p>
             </div>
 
-            {/* Executor */}
+            {/* Responsável */}
             <div className="space-y-2">
-              <Label htmlFor="executor_id">Executor</Label>
+              <Label htmlFor="executor_id">{lbl('executor', 'Responsável')}</Label>
               <Select
                 value={formData.executor_id}
                 onValueChange={(v) => setFormData((p) => ({ ...p, executor_id: v }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione o executor..." />
+                  <SelectValue placeholder="Selecione o responsável..." />
                 </SelectTrigger>
                 <SelectContent>
                   {executores.map((exec) => (
@@ -258,10 +327,8 @@ export function TarefaForm({
                 .map((coluna) => (
                   <div key={coluna.id} className="space-y-2">
                     <Label htmlFor={`col_${coluna.id}`}>
-                      {coluna.nome}
-                      {coluna.obrigatorio && ' *'}
+                      {coluna.nome}{coluna.obrigatorio && ' *'}
                     </Label>
-
                     {coluna.tipo === 'lista' && coluna.opcoes ? (
                       <Select
                         value={valoresCustomizados[coluna.id] ?? ''}
@@ -274,9 +341,7 @@ export function TarefaForm({
                         </SelectTrigger>
                         <SelectContent>
                           {coluna.opcoes.map((opcao) => (
-                            <SelectItem key={opcao} value={opcao}>
-                              {opcao}
-                            </SelectItem>
+                            <SelectItem key={opcao} value={opcao}>{opcao}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -323,20 +388,11 @@ export function TarefaForm({
         <div className="mt-6 flex gap-3">
           <Button type="submit" disabled={loading}>
             {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Salvando...
-              </>
-            ) : isEdit ? (
-              'Salvar Alterações'
-            ) : (
-              'Criar Tarefa'
-            )}
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Salvando...</>
+            ) : isEdit ? 'Salvar Alterações' : 'Criar Tarefa'}
           </Button>
           <Link href={`/unidades/${unidadeId}`}>
-            <Button variant="outline" type="button">
-              Cancelar
-            </Button>
+            <Button variant="outline" type="button">Cancelar</Button>
           </Link>
         </div>
       </form>

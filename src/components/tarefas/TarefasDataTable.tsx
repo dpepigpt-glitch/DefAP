@@ -237,7 +237,13 @@ export function TarefasDataTable({
         const tarefa = row.original
         const isLoading = loadingIds.has(tarefa.id)
         const isOwnTask = tarefa.executor_id === currentUserId
-        const canEdit = userRole === 'defensor' || userRole === 'gestor'
+        const isOverdue =
+          tarefa.status === 'pendente' &&
+          new Date(tarefa.prazo_interno) < new Date()
+        // Gestor cannot edit overdue tasks
+        const canEdit =
+          userRole === 'defensor' ||
+          (userRole === 'gestor' && !isOverdue)
         const canDelete = userRole === 'defensor'
         const canProtocolar = userRole === 'defensor'
         const canRemeter =

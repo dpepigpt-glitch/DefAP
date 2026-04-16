@@ -126,6 +126,24 @@ export async function updateTipoTarefa(tipoId: string, unidadeId: string, nome: 
   return { success: true }
 }
 
+export async function saveCampoLabel(unidadeId: string, campo: string, label: string) {
+  const supabase = await createClient()
+  if (!label?.trim()) {
+    // Delete override (revert to default)
+    await supabase
+      .from('unidade_campo_labels')
+      .delete()
+      .eq('unidade_id', unidadeId)
+      .eq('campo', campo)
+  } else {
+    await supabase
+      .from('unidade_campo_labels')
+      .upsert({ unidade_id: unidadeId, campo, label: label.trim() })
+  }
+  revalidatePath(`/unidades/${unidadeId}/configuracoes`)
+  return { success: true }
+}
+
 export async function createColunaCustomizada(
   unidadeId: string,
   data: { nome: string; tipo: string; opcoes?: string; obrigatorio: boolean; ordem: number }

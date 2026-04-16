@@ -11,6 +11,8 @@ export interface TarefaPayload {
   numero_processo: string
   assistido: string
   data_intimacao: string        // ISO date YYYY-MM-DD
+  inicio?: string               // ISO date YYYY-MM-DD
+  prazo_dias?: number           // workdays
   tipo_tarefa_id?: string
   prazo_final_pje: string       // ISO date YYYY-MM-DD
   prazo_interno: string         // ISO datetime
@@ -42,7 +44,6 @@ export async function createTarefa(payload: TarefaPayload) {
 
   if (error) return { error: 'Erro ao criar tarefa.' }
 
-  // Save custom column values
   if (valores_customizados && Object.keys(valores_customizados).length > 0) {
     const valores = Object.entries(valores_customizados)
       .filter(([, valor]) => valor !== undefined && valor !== '')
@@ -51,7 +52,6 @@ export async function createTarefa(payload: TarefaPayload) {
         coluna_id,
         valor,
       }))
-
     if (valores.length > 0) {
       await supabase.from('tarefa_valores_customizados').insert(valores)
     }
@@ -63,6 +63,28 @@ export async function createTarefa(payload: TarefaPayload) {
 
 export async function updateTarefa(tarefaId: string, payload: Partial<TarefaPayload>) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const role = user.user_metadata?.role ?? 'executor'
+
+  // Fetch current tarefa to check overdue status and build audit log
+  const { data: current } = await supabase
+    .from('tarefas')
+    .select('*')
+    .eq('id', tarefaId)
+    .single()
+
+  if (!current) return { error: 'Tarefa não encontrada.' }
+
+  // Gestor cannot edit overdue tasks
+  if (role === 'gestor') {
+    const now = new Date()
+    const prazo = new Date(current.prazo_interno)
+    if (prazo < now && current.status === 'pendente') {
+      return { error: 'Tarefas vencidas só podem ser editadas pelo Defensor.' }
+    }
+  }
 
   const { valores_customizados, ...tarefaData } = payload
 
@@ -81,7 +103,30 @@ export async function updateTarefa(tarefaId: string, payload: Partial<TarefaPayl
 
   if (error) return { error: 'Erro ao atualizar tarefa.' }
 
-  // Upsert custom column values
+  // Audit log for gestor edits
+  if (role === 'gestor') {
+    const campos: Record<string, { antes: unknown; depois: unknown }> = {}
+    const tracked = [
+      'numero_processo', 'assistido', 'data_intimacao', 'inicio', 'prazo_dias',
+      'prazo_final_pje', 'prazo_interno', 'executor_id', 'tipo_tarefa_id',
+    ]
+    for (const campo of tracked) {
+      const novo = (updateData as Record<string, unknown>)[campo]
+      if (novo !== undefined && String(novo) !== String(current[campo])) {
+        campos[campo] = { antes: current[campo], depois: novo }
+      }
+    }
+    if (Object.keys(campos).length > 0) {
+      await supabase.from('tarefa_logs').insert({
+        tarefa_id: tarefaId,
+        changed_by: user.id,
+        new_status: current.status,
+        tipo_alteracao: 'edicao',
+        campos_alterados: campos,
+      })
+    }
+  }
+
   if (valores_customizados) {
     for (const [coluna_id, valor] of Object.entries(valores_customizados)) {
       await supabase
@@ -134,7 +179,6 @@ export async function deleteTarefa(tarefaId: string, unidadeId: string) {
   return { success: true }
 }
 
-// Executor action: can only mark as remetido and upload file
 export async function executorSubmitTarefa(
   tarefaId: string,
   unidadeId: string,
@@ -145,9 +189,7 @@ export async function executorSubmitTarefa(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const updateData: Record<string, unknown> = {
-    status: 'remetido_ao_defensor',
-  }
+  const updateData: Record<string, unknown> = { status: 'remetido_ao_defensor' }
   if (arquivoUrl) {
     updateData.arquivo_url = arquivoUrl
     updateData.arquivo_nome = arquivoNome
@@ -157,7 +199,7 @@ export async function executorSubmitTarefa(
     .from('tarefas')
     .update(updateData)
     .eq('id', tarefaId)
-    .eq('executor_id', user.id) // Extra safety: only own tasks
+    .eq('executor_id', user.id)
 
   if (error) return { error: 'Erro ao remeter tarefa.' }
 
@@ -165,7 +207,6 @@ export async function executorSubmitTarefa(
   return { success: true }
 }
 
-// Confirm protocolado with password re-verification
 export async function confirmProtocolado(
   tarefaId: string,
   unidadeId: string,
@@ -173,17 +214,11 @@ export async function confirmProtocolado(
   password: string
 ) {
   const supabase = await createClient()
-
-  // Re-verify credentials
   const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
-  if (authError) {
-    return { error: 'Senha incorreta.' }
-  }
-
+  if (authError) return { error: 'Senha incorreta.' }
   return updateTarefaStatus(tarefaId, 'protocolado', unidadeId)
 }
 
-// Bulk import from CSV/Excel
 export async function importarTarefas(
   unidadeId: string,
   rows: Omit<TarefaPayload, 'unidade_id'>[]
