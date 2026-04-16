@@ -10,7 +10,7 @@ interface UnidadePageHeaderProps {
   tarefas: Tarefa[]
 }
 
-export function UnidadePageHeader({ unidade, role, tarefas }: UnidadePageHeaderProps) {
+export function UnidadePageHeader({ unidade, role: _role, tarefas }: UnidadePageHeaderProps) {
   const counts = countByUrgency(tarefas)
 
   return (

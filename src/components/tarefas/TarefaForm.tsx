@@ -13,7 +13,7 @@ import { maskDate, dateToISO, isoToDisplay } from '@/lib/utils/dateMask'
 import { toTitleCase } from '@/lib/utils/titleCase'
 import { calcPrazoFinal } from '@/lib/utils/workdays'
 import { Loader2, ArrowLeft, CalendarCheck } from 'lucide-react'
-import type { Tarefa, TipoTarefa, Profile, ColunaCustomizada, CampoLabel, CAMPO_DEFAULTS } from '@/types'
+import type { Tarefa, TipoTarefa, Profile, ColunaCustomizada, CampoLabel } from '@/types'
 import Link from 'next/link'
 
 interface TarefaFormProps {
@@ -26,7 +26,7 @@ interface TarefaFormProps {
   isOverdue?: boolean
 }
 
-function useLabel(campoLabels: CampoLabel[] | undefined, campo: string, defaultLabel: string) {
+function getLabel(campoLabels: CampoLabel[] | undefined, campo: string, defaultLabel: string) {
   return campoLabels?.find((cl) => cl.campo === campo)?.label ?? defaultLabel
 }
 
@@ -132,7 +132,7 @@ export function TarefaForm({
     router.refresh()
   }
 
-  const lbl = (campo: string, def: string) => useLabel(campoLabels, campo, def)
+  const lbl = (campo: string, def: string) => getLabel(campoLabels, campo, def)
 
   return (
     <div className="max-w-2xl space-y-6">

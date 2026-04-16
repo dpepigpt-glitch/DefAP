@@ -74,7 +74,7 @@ const PETICAO_MAP: Record<string, string> = {
   'peticao inicial': 'Petição Inicial',
 }
 
-function normalizePeticao(val: string): string {
+function _normalizePeticao(val: string): string {
   const lower = val.toLowerCase().trim()
   return PETICAO_MAP[lower] ?? toTitleCase(val)
 }

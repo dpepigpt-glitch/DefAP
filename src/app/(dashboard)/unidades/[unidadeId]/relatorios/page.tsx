@@ -157,7 +157,7 @@ export default async function RelatoriosPage({ params }: PageProps) {
           </div>
         ) : (
           <div className="space-y-3">
-            {rankings.map(({ executor, tarefas, total, noPrazo, selo }) => {
+            {rankings.map(({ executor, total, noPrazo, selo }) => {
               const pct = total > 0 ? Math.round((noPrazo / total) * 100) : 0
               return (
                 <Card key={executor.id}>
