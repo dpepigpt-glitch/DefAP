@@ -203,16 +203,17 @@ export default function ImportarPage() {
     const prazoInternoISO =
       dateToISO(cellToDateString(mapped.prazo_interno ?? '')) || prazoFinalISO
 
-    return {
+    const payload: Omit<TarefaPayload, 'unidade_id'> = {
       numero_processo: maskProcesso(mapped.numero_processo ?? ''),
       assistido: toTitleCase(mapped.assistido ?? ''),
       data_intimacao: dataIntimacaoISO,
-      inicio: inicioISO || undefined,
-      prazo_dias: prazoDias > 0 ? prazoDias : undefined,
       prazo_final_pje: prazoFinalISO,
-      prazo_interno: prazoInternoISO ? prazoInternoISO + 'T17:00:00' : '',
+      prazo_interno: (prazoInternoISO || prazoFinalISO) + 'T17:00:00',
       status: parseStatusRaw(mapped.status_raw ?? ''),
-    } as Omit<TarefaPayload, 'unidade_id'>
+    }
+    if (inicioISO) payload.inicio = inicioISO
+    if (prazoDias > 0) payload.prazo_dias = prazoDias
+    return payload
   }
 
   async function handleImport() {

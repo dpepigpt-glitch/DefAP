@@ -250,7 +250,7 @@ export async function importarTarefas(
       .single()
 
     if (error) {
-      errors.push({ row: i + 1, message: `Linha ${i + 1}: Erro ao inserir` })
+      errors.push({ row: i + 1, message: `Linha ${i + 1}: ${error.message}` })
     } else {
       inserted.push(tarefa.id)
     }
