@@ -13,27 +13,49 @@ import Link from 'next/link'
 
 // Flexible column name mapping for CSV/Excel headers
 const COLUMN_MAP: Record<string, string> = {
+  // Process number
   'processo': 'numero_processo',
   'número do processo': 'numero_processo',
   'numero do processo': 'numero_processo',
   'n processo': 'numero_processo',
+  // Assisted person
   'assistido': 'assistido',
   'nome': 'assistido',
+  // Intimation date
   'data intimação': 'data_intimacao',
   'data intimacao': 'data_intimacao',
   'data de intimação': 'data_intimacao',
+  // Task type / petition type
+  'petição': 'tipo_peticao_nome',
+  'peticao': 'tipo_peticao_nome',
   'tipo de petição': 'tipo_peticao_nome',
   'tipo de peticao': 'tipo_peticao_nome',
   'tipo petição': 'tipo_peticao_nome',
   'tipo peticao': 'tipo_peticao_nome',
   'tipo': 'tipo_peticao_nome',
+  // PJE deadline
   'prazo final pje': 'prazo_final_pje',
   'prazo pje': 'prazo_final_pje',
-  'executor': 'executor_email',
-  'responsável': 'executor_email',
-  'responsavel': 'executor_email',
+  'final do prazo': 'prazo_final_pje',
+  'data da final do prazo': 'prazo_final_pje',
+  'data final do prazo': 'prazo_final_pje',
+  // Executor / responsible
+  'executor': 'executor_nome',
+  'responsável': 'executor_nome',
+  'responsavel': 'executor_nome',
+  // Internal deadline
   'prazo interno': 'prazo_interno',
   'prazo': 'prazo_interno',
+  // Status (from "Protocolo" column)
+  'protocolo': 'status_raw',
+  'status': 'status_raw',
+}
+
+function parseStatusRaw(val: string): 'pendente' | 'remetido_ao_defensor' | 'protocolado' {
+  const v = (val ?? '').toLowerCase().trim()
+  if (v.includes('protocol')) return 'protocolado'
+  if (v.includes('remetid')) return 'remetido_ao_defensor'
+  return 'pendente'
 }
 
 type ParsedRow = Record<string, string>
@@ -180,12 +202,17 @@ export default function ImportarPage() {
         if (mappedKey) mapped[mappedKey] = val
       })
 
+      const prazoInternoDate = dateToISO(cellToDateString(mapped.prazo_interno ?? ''))
+      // data_intimacao fallback: use prazo_interno if not present in sheet
+      const dataIntimacao = dateToISO(cellToDateString(mapped.data_intimacao ?? '')) || prazoInternoDate
+
       return {
         numero_processo: maskProcesso(mapped.numero_processo ?? ''),
         assistido: toTitleCase(mapped.assistido ?? ''),
-        data_intimacao: dateToISO(mapped.data_intimacao ?? ''),
-        prazo_final_pje: dateToISO(mapped.prazo_final_pje ?? ''),
-        prazo_interno: dateToISO(mapped.prazo_interno ?? '') + 'T17:00:00',
+        data_intimacao: dataIntimacao,
+        prazo_final_pje: dateToISO(cellToDateString(mapped.prazo_final_pje ?? '')),
+        prazo_interno: prazoInternoDate ? prazoInternoDate + 'T17:00:00' : '',
+        status: parseStatusRaw(mapped.status_raw ?? ''),
       } as Omit<TarefaPayload, 'unidade_id'>
     })
 

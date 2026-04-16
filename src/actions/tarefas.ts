@@ -15,6 +15,7 @@ export interface TarefaPayload {
   prazo_final_pje: string       // ISO date YYYY-MM-DD
   prazo_interno: string         // ISO datetime
   executor_id?: string
+  status?: 'pendente' | 'remetido_ao_defensor' | 'protocolado'
   valores_customizados?: Record<string, string>
 }
 
