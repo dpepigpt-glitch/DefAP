@@ -70,7 +70,7 @@ export function DeleteUnidadeDialog({
           <DialogDescription className="space-y-2 pt-2">
             <span className="block">
               Você está prestes a excluir permanentemente a unidade{' '}
-              <strong>"{unidadeNome}"</strong> e{' '}
+              <strong>&ldquo;{unidadeNome}&rdquo;</strong> e{' '}
               <strong>todos os seus dados</strong> (tarefas, configurações, histórico).
             </span>
             <span className="block text-red-600 font-medium">
