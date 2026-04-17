@@ -1,16 +1,51 @@
 'use client'
 
 import { countByUrgency } from '@/lib/utils/prazoStatus'
-import type { Tarefa, Unidade } from '@/types'
-import { AlertTriangle, Clock, CheckCircle2, Send, Building2 } from 'lucide-react'
+import type { Tarefa, Unidade, TarefaStatus } from '@/types'
+import { AlertTriangle, Clock, CheckCircle2, Send, Building2, Archive } from 'lucide-react'
+import { cn } from '@/lib/utils/cn'
+
+type FilterValue = TarefaStatus | 'warning24h' | 'overdue'
 
 interface UnidadePageHeaderProps {
   unidade: Unidade
-  role?: 'defensor' | 'gestor' | 'executor'
   tarefas: Tarefa[]
+  activeFilter?: FilterValue | null
+  onFilterClick?: (filter: FilterValue) => void
 }
 
-export function UnidadePageHeader({ unidade, role: _role, tarefas }: UnidadePageHeaderProps) {
+interface CardProps {
+  count: number
+  label: string
+  filterKey: FilterValue
+  colorClasses: { bg: string; border: string; num: string; text: string; activeBorder: string }
+  icon: React.ReactNode
+  activeFilter?: FilterValue | null
+  onFilterClick?: (f: FilterValue) => void
+}
+
+function SummaryCard({ count, label, filterKey, colorClasses, icon, activeFilter, onFilterClick }: CardProps) {
+  const isActive = activeFilter === filterKey
+  return (
+    <button
+      onClick={() => onFilterClick?.(filterKey)}
+      className={cn(
+        'rounded-lg p-3 flex items-center gap-3 text-left transition-all w-full',
+        colorClasses.bg,
+        'border',
+        isActive ? cn(colorClasses.activeBorder, 'ring-2', colorClasses.activeBorder.replace('border-', 'ring-'), 'shadow-sm') : colorClasses.border,
+      )}
+    >
+      <span className="flex-shrink-0">{icon}</span>
+      <div>
+        <p className={cn('text-xl font-bold', colorClasses.num)}>{count}</p>
+        <p className={cn('text-xs', colorClasses.text)}>{label}{isActive ? ' ✓' : ''}</p>
+      </div>
+    </button>
+  )
+}
+
+export function UnidadePageHeader({ unidade, tarefas, activeFilter, onFilterClick }: UnidadePageHeaderProps) {
   const counts = countByUrgency(tarefas)
 
   return (
@@ -22,44 +57,57 @@ export function UnidadePageHeader({ unidade, role: _role, tarefas }: UnidadePage
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{unidade.nome}</h1>
           <p className="text-gray-500 text-sm">
-            {tarefas.length} tarefa{tarefas.length !== 1 ? 's' : ''} no total
+            {tarefas.length} tarefa{tarefas.length !== 1 ? 's' : ''} · clique num card para filtrar
           </p>
         </div>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-green-50 border border-green-100 rounded-lg p-3 flex items-center gap-3">
-          <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
-          <div>
-            <p className="text-xl font-bold text-green-700">{counts.onTime}</p>
-            <p className="text-xs text-green-600">No prazo</p>
-          </div>
-        </div>
-
-        <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-3 flex items-center gap-3">
-          <Clock className="h-5 w-5 text-yellow-500 flex-shrink-0" />
-          <div>
-            <p className="text-xl font-bold text-yellow-700">{counts.warning24h}</p>
-            <p className="text-xs text-yellow-600">Vence em 24h</p>
-          </div>
-        </div>
-
-        <div className="bg-red-50 border border-red-100 rounded-lg p-3 flex items-center gap-3">
-          <AlertTriangle className="h-5 w-5 text-red-500 flex-shrink-0" />
-          <div>
-            <p className="text-xl font-bold text-red-700">{counts.overdue}</p>
-            <p className="text-xs text-red-600">Vencidas</p>
-          </div>
-        </div>
-
-        <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 flex items-center gap-3">
-          <Send className="h-5 w-5 text-blue-500 flex-shrink-0" />
-          <div>
-            <p className="text-xl font-bold text-blue-700">{counts.remetido}</p>
-            <p className="text-xs text-blue-600">Remetidas</p>
-          </div>
-        </div>
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <SummaryCard
+          count={counts.onTime}
+          label="No prazo"
+          filterKey="pendente"
+          colorClasses={{ bg: 'bg-green-50', border: 'border-green-100', activeBorder: 'border-green-500', num: 'text-green-700', text: 'text-green-600' }}
+          icon={<CheckCircle2 className="h-5 w-5 text-green-500" />}
+          activeFilter={activeFilter}
+          onFilterClick={onFilterClick}
+        />
+        <SummaryCard
+          count={counts.warning24h}
+          label="Vence em 24h"
+          filterKey="warning24h"
+          colorClasses={{ bg: 'bg-yellow-50', border: 'border-yellow-100', activeBorder: 'border-yellow-500', num: 'text-yellow-700', text: 'text-yellow-600' }}
+          icon={<Clock className="h-5 w-5 text-yellow-500" />}
+          activeFilter={activeFilter}
+          onFilterClick={onFilterClick}
+        />
+        <SummaryCard
+          count={counts.overdue}
+          label="Vencidas"
+          filterKey="overdue"
+          colorClasses={{ bg: 'bg-red-50', border: 'border-red-100', activeBorder: 'border-red-500', num: 'text-red-700', text: 'text-red-600' }}
+          icon={<AlertTriangle className="h-5 w-5 text-red-500" />}
+          activeFilter={activeFilter}
+          onFilterClick={onFilterClick}
+        />
+        <SummaryCard
+          count={counts.remetido}
+          label="Remetidas"
+          filterKey="remetido_ao_defensor"
+          colorClasses={{ bg: 'bg-blue-50', border: 'border-blue-100', activeBorder: 'border-blue-500', num: 'text-blue-700', text: 'text-blue-600' }}
+          icon={<Send className="h-5 w-5 text-blue-500" />}
+          activeFilter={activeFilter}
+          onFilterClick={onFilterClick}
+        />
+        <SummaryCard
+          count={counts.protocolado}
+          label="Protocoladas"
+          filterKey="protocolado"
+          colorClasses={{ bg: 'bg-gray-50', border: 'border-gray-200', activeBorder: 'border-gray-500', num: 'text-gray-700', text: 'text-gray-500' }}
+          icon={<Archive className="h-5 w-5 text-gray-400" />}
+          activeFilter={activeFilter}
+          onFilterClick={onFilterClick}
+        />
       </div>
     </div>
   )

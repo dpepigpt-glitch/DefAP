@@ -2,11 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { TarefasDataTable } from '@/components/tarefas/TarefasDataTable'
-import { UnidadePageHeader } from '@/components/unidades/UnidadePageHeader'
-import { FilterSidebar } from '@/components/tarefas/FilterSidebar'
+import { UnidadeView } from '@/components/unidades/UnidadeView'
 import { Plus, Upload, Settings } from 'lucide-react'
-import type { Tarefa, ColunaCustomizada, TipoTarefa, Profile } from '@/types'
+import type { Tarefa, ColunaCustomizada } from '@/types'
 
 interface PageProps {
   params: { unidadeId: string }
@@ -20,7 +18,6 @@ export default async function UnidadePage({ params }: PageProps) {
 
   const role = (user.user_metadata?.role ?? 'executor') as 'defensor' | 'gestor' | 'executor'
 
-  // Fetch unit
   const { data: unidade } = await supabase
     .from('unidades')
     .select('*')
@@ -29,7 +26,6 @@ export default async function UnidadePage({ params }: PageProps) {
 
   if (!unidade) redirect('/unidades')
 
-  // Fetch tasks with related data
   let tarefasQuery = supabase
     .from('tarefas')
     .select(`
@@ -41,49 +37,22 @@ export default async function UnidadePage({ params }: PageProps) {
     .eq('unidade_id', unidadeId)
     .order('prazo_interno', { ascending: true })
 
-  // Executor sees only their own tasks; defensor and gestor see all
   if (role === 'executor') {
     tarefasQuery = tarefasQuery.eq('executor_id', user.id)
   }
 
-  const { data: tarefas } = await tarefasQuery
-
-  // Fetch custom columns
-  const { data: colunas } = await supabase
-    .from('colunas_customizadas')
-    .select('*')
-    .eq('unidade_id', unidadeId)
-    .eq('ativo', true)
-    .order('ordem', { ascending: true })
-
-  // Fetch task types for filter
-  const { data: tiposTarefa } = await supabase
-    .from('tipos_tarefa')
-    .select('*')
-    .eq('unidade_id', unidadeId)
-    .eq('ativo', true)
-    .order('nome')
-
-  // Fetch executors for filter (defensor and gestor see all members)
-  let executores: Profile[] = []
-  if (role === 'defensor' || role === 'gestor') {
-    const { data: membros } = await supabase
-      .from('unidade_membros')
-      .select('profile:profiles(id, full_name, email)')
+  const [{ data: tarefas }, { data: colunas }] = await Promise.all([
+    tarefasQuery,
+    supabase
+      .from('colunas_customizadas')
+      .select('*')
       .eq('unidade_id', unidadeId)
-    executores = membros?.map((m: any) => m.profile).filter(Boolean) ?? []
-  }
-
-  const typedTarefas = (tarefas ?? []) as unknown as Tarefa[]
+      .eq('ativo', true)
+      .order('ordem', { ascending: true }),
+  ])
 
   return (
-    <div className="space-y-6">
-      <UnidadePageHeader
-        unidade={unidade}
-        role={role}
-        tarefas={typedTarefas}
-      />
-
+    <div className="space-y-4">
       {/* Action buttons */}
       {(role === 'defensor' || role === 'gestor') && (
         <div className="flex items-center gap-3 flex-wrap">
@@ -110,27 +79,13 @@ export default async function UnidadePage({ params }: PageProps) {
         </div>
       )}
 
-      <div className="flex gap-6">
-        {/* Filter sidebar */}
-        <div className="w-60 flex-shrink-0">
-          <FilterSidebar
-            tiposTarefa={(tiposTarefa ?? []) as TipoTarefa[]}
-            executores={executores}
-            userRole={role}
-          />
-        </div>
-
-        {/* Main DataTable */}
-        <div className="flex-1 min-w-0">
-          <TarefasDataTable
-            tarefas={typedTarefas}
-            colunas={(colunas ?? []) as ColunaCustomizada[]}
-            unidadeId={unidadeId}
-            userRole={role}
-            currentUserId={user.id}
-          />
-        </div>
-      </div>
+      <UnidadeView
+        unidade={unidade}
+        tarefas={(tarefas ?? []) as unknown as Tarefa[]}
+        colunas={(colunas ?? []) as ColunaCustomizada[]}
+        userRole={role}
+        currentUserId={user.id}
+      />
     </div>
   )
 }
