@@ -32,13 +32,13 @@ export default async function RelatoriosPage({ params }: PageProps) {
     .eq('id', unidadeId)
     .single()
 
-  // Get all completed tasks with executor info
+  // Get all remetidas + protocoladas tasks (badge is based on remetido_at)
   const { data: tarefas } = await supabase
     .from('tarefas')
     .select('*, executor:profiles!executor_id(id, full_name, email)')
     .eq('unidade_id', unidadeId)
-    .eq('status', 'protocolado')
-    .not('protocolado_at', 'is', null)
+    .in('status', ['remetido_ao_defensor', 'protocolado'])
+    .not('remetido_at', 'is', null)
 
   const typedTarefas = (tarefas ?? []) as unknown as Tarefa[]
 
@@ -63,7 +63,7 @@ export default async function RelatoriosPage({ params }: PageProps) {
       tarefas: entry.tarefas,
       total: entry.tarefas.length,
       noPrazo: entry.tarefas.filter(
-        (t) => t.protocolado_at && new Date(t.protocolado_at) <= new Date(t.prazo_interno)
+        (t) => t.remetido_at && new Date(t.remetido_at) <= new Date(t.prazo_interno)
       ).length,
       selo: calcularSelo(entry.tarefas),
     }))

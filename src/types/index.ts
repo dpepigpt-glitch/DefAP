@@ -72,6 +72,7 @@ export interface Tarefa {
   created_by: string | null
   created_at: string
   updated_at: string
+  remetido_at: string | null
   protocolado_at: string | null
   protocolado_by: string | null
   // Joined fields

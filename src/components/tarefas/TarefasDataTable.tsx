@@ -13,7 +13,7 @@ import {
   type ColumnFiltersState,
   type ColumnDef,
 } from '@tanstack/react-table'
-import { ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Pencil, Trash2, CheckSquare } from 'lucide-react'
+import { ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Pencil, Trash2, CheckSquare, RotateCcw } from 'lucide-react'
 import type { Tarefa, ColunaCustomizada } from '@/types'
 import { getRowClass, getUrgencyLevel } from '@/lib/utils/prazoStatus'
 import { isoToDisplay } from '@/lib/utils/dateMask'
@@ -27,7 +27,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
-import { updateTarefaStatus, executorSubmitTarefa, deleteTarefa } from '@/actions/tarefas'
+import { updateTarefaStatus, executorSubmitTarefa, deleteTarefa, revertTarefaStatus } from '@/actions/tarefas'
 import { cn } from '@/lib/utils/cn'
 import Link from 'next/link'
 
@@ -250,6 +250,9 @@ export function TarefasDataTable({
           userRole === 'defensor' ||
           userRole === 'gestor' ||
           (userRole === 'executor' && isOwnTask)
+        const canRevert =
+          (userRole === 'defensor' || userRole === 'gestor') &&
+          tarefa.status === 'remetido_ao_defensor'
 
         return (
           <DropdownMenu>
@@ -287,6 +290,20 @@ export function TarefasDataTable({
                 >
                   <CheckSquare className="h-4 w-4 mr-2" />
                   Remeter ao Defensor
+                </DropdownMenuItem>
+              )}
+
+              {canRevert && (
+                <DropdownMenuItem
+                  onClick={async () => {
+                    setLoadingIds((prev) => new Set(prev).add(tarefa.id))
+                    await revertTarefaStatus(tarefa.id, unidadeId)
+                    setLoadingIds((prev) => { const n = new Set(prev); n.delete(tarefa.id); return n })
+                  }}
+                  className="text-orange-600 focus:text-orange-600"
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Desfazer Remetida
                 </DropdownMenuItem>
               )}
 

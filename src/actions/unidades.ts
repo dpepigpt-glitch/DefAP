@@ -65,7 +65,7 @@ export async function addMembro(
 
   if (error) {
     if (error.code === '23505') return { error: 'Este usuário já é membro desta unidade.' }
-    return { error: 'Erro ao adicionar membro.' }
+    return { error: `Erro ao adicionar membro: ${error.message}` }
   }
 
   // If adding as gestor, promote the user's global role
@@ -197,5 +197,28 @@ export async function updateColunaCustomizada(
   if (error) return { error: 'Erro ao atualizar coluna.' }
 
   revalidatePath(`/unidades/${unidadeId}/configuracoes`)
+  return { success: true }
+}
+
+export async function deleteUnidade(unidadeId: string, password: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  // Verify defensor password before destructive action
+  const { error: authError } = await supabase.auth.signInWithPassword({
+    email: user.email!,
+    password,
+  })
+  if (authError) return { error: 'Senha incorreta.' }
+
+  const { error } = await supabase
+    .from('unidades')
+    .delete()
+    .eq('id', unidadeId)
+
+  if (error) return { error: 'Erro ao excluir unidade.' }
+
+  revalidatePath('/unidades')
   return { success: true }
 }

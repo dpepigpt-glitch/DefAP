@@ -4,6 +4,7 @@ import { ExecutoresManager } from '@/components/configuracoes/ExecutoresManager'
 import { TiposTarefaManager } from '@/components/configuracoes/TiposTarefaManager'
 import { ColunasManager } from '@/components/configuracoes/ColunasManager'
 import { CamposManager } from '@/components/configuracoes/CamposManager'
+import { DeleteUnidadeSection } from '@/components/unidades/DeleteUnidadeSection'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Settings, History } from 'lucide-react'
@@ -75,6 +76,11 @@ export default async function ConfiguracoesPage({ params }: PageProps) {
       <ColunasManager
         unidadeId={unidadeId}
         colunas={(colunasResult.data ?? []) as ColunaCustomizada[]}
+      />
+
+      <DeleteUnidadeSection
+        unidadeId={unidadeId}
+        unidadeNome={unidadeResult.data.nome}
       />
     </div>
   )

@@ -148,9 +148,13 @@ export async function updateTarefaStatus(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const now = new Date().toISOString()
   const updateData: Record<string, unknown> = { status }
+  if (status === 'remetido_ao_defensor') {
+    updateData.remetido_at = now
+  }
   if (status === 'protocolado') {
-    updateData.protocolado_at = new Date().toISOString()
+    updateData.protocolado_at = now
     updateData.protocolado_by = user.id
   }
 
@@ -160,6 +164,26 @@ export async function updateTarefaStatus(
     .eq('id', tarefaId)
 
   if (error) return { error: 'Erro ao atualizar status.' }
+
+  revalidatePath(`/unidades/${unidadeId}`)
+  return { success: true }
+}
+
+export async function revertTarefaStatus(tarefaId: string, unidadeId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const role = user.user_metadata?.role ?? 'executor'
+  if (role === 'executor') return { error: 'Sem permissão.' }
+
+  const { error } = await supabase
+    .from('tarefas')
+    .update({ status: 'pendente', remetido_at: null })
+    .eq('id', tarefaId)
+    .eq('status', 'remetido_ao_defensor')
+
+  if (error) return { error: 'Erro ao reverter status.' }
 
   revalidatePath(`/unidades/${unidadeId}`)
   return { success: true }
@@ -189,7 +213,10 @@ export async function executorSubmitTarefa(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const updateData: Record<string, unknown> = { status: 'remetido_ao_defensor' }
+  const updateData: Record<string, unknown> = {
+    status: 'remetido_ao_defensor',
+    remetido_at: new Date().toISOString(),
+  }
   if (arquivoUrl) {
     updateData.arquivo_url = arquivoUrl
     updateData.arquivo_nome = arquivoNome
