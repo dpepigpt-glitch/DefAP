@@ -203,6 +203,27 @@ export async function deleteTarefa(tarefaId: string, unidadeId: string) {
   return { success: true }
 }
 
+export async function deleteTarefasEmLote(tarefaIds: string[], unidadeId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const role = user.user_metadata?.role ?? 'executor'
+  if (role !== 'defensor') return { error: 'Sem permissão.' }
+  if (tarefaIds.length === 0) return { success: true, deleted: 0 }
+
+  const { error } = await supabase
+    .from('tarefas')
+    .delete()
+    .in('id', tarefaIds)
+    .eq('unidade_id', unidadeId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath(`/unidades/${unidadeId}`)
+  return { success: true, deleted: tarefaIds.length }
+}
+
 export async function executorSubmitTarefa(
   tarefaId: string,
   unidadeId: string,

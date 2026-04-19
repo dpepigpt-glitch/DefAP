@@ -28,7 +28,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
-import { updateTarefaStatus, executorSubmitTarefa, deleteTarefa, revertTarefaStatus } from '@/actions/tarefas'
+import { updateTarefaStatus, executorSubmitTarefa, deleteTarefa, revertTarefaStatus, deleteTarefasEmLote } from '@/actions/tarefas'
 import { cn } from '@/lib/utils/cn'
 import Link from 'next/link'
 
@@ -90,6 +90,35 @@ export function TarefasDataTable({
     numeroProcesso: string
   }>({ open: false, tarefaId: '', numeroProcesso: '' })
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set())
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll(visibleIds: string[]) {
+    setSelectedIds((prev) => {
+      const allSelected = visibleIds.every((id) => prev.has(id))
+      if (allSelected) return new Set()
+      return new Set(visibleIds)
+    })
+  }
+
+  async function handleBulkDelete(visibleIds: string[]) {
+    const ids = visibleIds.filter((id) => selectedIds.has(id))
+    if (ids.length === 0) return
+    if (!confirm(`Excluir ${ids.length} tarefa${ids.length !== 1 ? 's' : ''} selecionada${ids.length !== 1 ? 's' : ''}? Esta ação não pode ser desfeita.`)) return
+    setBulkDeleting(true)
+    await deleteTarefasEmLote(ids, unidadeId)
+    setSelectedIds(new Set())
+    setBulkDeleting(false)
+  }
 
   async function handleStatusChange(
     tarefa: Tarefa,
@@ -348,8 +377,26 @@ export function TarefasDataTable({
       },
     }
 
+    // Checkbox column — only for defensor
+    if (userRole === 'defensor') {
+      const checkboxCol: ColumnDef<Tarefa> = {
+        id: '_select',
+        header: () => null, // rendered manually to access filtered rows
+        cell: ({ row }) => (
+          <input
+            type="checkbox"
+            checked={selectedIds.has(row.original.id)}
+            onChange={() => toggleSelect(row.original.id)}
+            onClick={(e) => e.stopPropagation()}
+            className="w-4 h-4 rounded border-gray-300 accent-green-700 cursor-pointer"
+          />
+        ),
+      }
+      return [checkboxCol, ...orderedColumns, actionsColumn]
+    }
+
     return [...orderedColumns, actionsColumn]
-  }, [colunas, colunasLayout, unidadeId, userRole, currentUserId, loadingIds])
+  }, [colunas, colunasLayout, unidadeId, userRole, currentUserId, loadingIds, selectedIds])
 
   const table = useReactTable({
     data: tarefas,
@@ -378,8 +425,42 @@ export function TarefasDataTable({
     },
   })
 
+  const filteredRows = table.getFilteredRowModel().rows
+  const filteredIds = filteredRows.map((r) => r.original.id)
+  const selectedCount = filteredIds.filter((id) => selectedIds.has(id)).length
+  const allSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedIds.has(id))
+
   return (
     <>
+      {/* Bulk action bar */}
+      {userRole === 'defensor' && selectedCount > 0 && (
+        <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 mb-2">
+          <span className="text-sm font-medium text-green-800">
+            {selectedCount} tarefa{selectedCount !== 1 ? 's' : ''} selecionada{selectedCount !== 1 ? 's' : ''}
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs h-7"
+              onClick={() => setSelectedIds(new Set())}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="text-xs h-7"
+              disabled={bulkDeleting}
+              onClick={() => handleBulkDelete(filteredIds)}
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1" />
+              {bulkDeleting ? 'Excluindo...' : `Excluir ${selectedCount}`}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-xl border border-gray-200 overflow-hidden bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -391,12 +472,17 @@ export function TarefasDataTable({
                       key={header.id}
                       className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap"
                     >
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
+                      {header.id === '_select' ? (
+                        <input
+                          type="checkbox"
+                          checked={allSelected}
+                          onChange={() => toggleSelectAll(filteredIds)}
+                          className="w-4 h-4 rounded border-gray-300 accent-green-700 cursor-pointer"
+                          title="Selecionar todas"
+                        />
+                      ) : header.isPlaceholder ? null : (
+                        flexRender(header.column.columnDef.header, header.getContext())
+                      )}
                     </th>
                   ))}
                 </tr>
