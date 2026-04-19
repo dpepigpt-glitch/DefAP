@@ -19,6 +19,7 @@ export interface Unidade {
   id: string
   nome: string
   defensor_id: string
+  colunas_layout: string[] | null
   created_at: string
   updated_at: string
 }

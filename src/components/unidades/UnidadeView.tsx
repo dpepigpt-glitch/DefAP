@@ -54,6 +54,7 @@ export function UnidadeView({
       <TarefasDataTable
         tarefas={filteredTarefas}
         colunas={colunas}
+        colunasLayout={unidade.colunas_layout}
         unidadeId={unidade.id}
         userRole={userRole}
         currentUserId={currentUserId}

@@ -65,33 +65,35 @@ export function isWorkday(date: Date): boolean {
 }
 
 /**
- * Returns the date that is `n` workdays from startDate,
- * counting startDate as day 1 if it is a workday.
- * If startDate is a weekend/holiday, counting starts from the next workday.
- *
- * Example: inicio=01/02 (Mon), prazo=5 → result=05/02 (Fri)
+ * Advances date to the next workday if it falls on a weekend or holiday.
  */
-export function addWorkdays(startDate: Date, n: number): Date {
-  if (n <= 0) return new Date(startDate)
-  const current = new Date(startDate)
-  let count = 0
-
-  while (count < n) {
-    if (isWorkday(current)) count++
-    if (count < n) current.setDate(current.getDate() + 1)
+function nextWorkday(date: Date): Date {
+  const d = new Date(date)
+  while (!isWorkday(d)) {
+    d.setDate(d.getDate() + 1)
   }
-
-  return new Date(current)
+  return d
 }
 
 /**
- * Given a DD/MM/YYYY string and number of workdays,
+ * Returns the date that is `n` calendar days from startDate,
+ * adjusted so the result never falls on a weekend or holiday.
+ * Only the end date is adjusted — intermediate days can be weekends/holidays.
+ */
+export function addCalendarDays(startDate: Date, n: number): Date {
+  const result = new Date(startDate)
+  result.setDate(result.getDate() + n)
+  return nextWorkday(result)
+}
+
+/**
+ * Given a DD/MM/YYYY string and number of calendar days,
  * returns the resulting date as DD/MM/YYYY string.
- * Returns '' if input is invalid.
+ * If the computed end date falls on a weekend/holiday, it advances
+ * to the next workday. Returns '' if input is invalid.
  */
 export function calcPrazoFinal(inicioStr: string, prazoDias: number): string {
   if (!inicioStr || prazoDias <= 0) return ''
-  // Parse DD/MM/YYYY
   const parts = inicioStr.split('/')
   if (parts.length !== 3) return ''
   const [dd, mm, yyyy] = parts.map(Number)
@@ -100,7 +102,7 @@ export function calcPrazoFinal(inicioStr: string, prazoDias: number): string {
   const inicio = new Date(yyyy, mm - 1, dd)
   if (isNaN(inicio.getTime())) return ''
 
-  const result = addWorkdays(inicio, prazoDias)
+  const result = addCalendarDays(inicio, prazoDias)
   return [
     String(result.getDate()).padStart(2, '0'),
     String(result.getMonth() + 1).padStart(2, '0'),

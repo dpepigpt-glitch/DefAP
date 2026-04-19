@@ -155,7 +155,7 @@ export async function createColunaCustomizada(
     ? data.opcoes.split('\n').map((o) => o.trim()).filter(Boolean)
     : null
 
-  const { error } = await supabase
+  const { data: created, error } = await supabase
     .from('colunas_customizadas')
     .insert({
       unidade_id: unidadeId,
@@ -165,11 +165,13 @@ export async function createColunaCustomizada(
       obrigatorio: data.obrigatorio,
       ordem: data.ordem,
     })
+    .select('id')
+    .single()
 
   if (error) return { error: 'Erro ao criar coluna.' }
 
   revalidatePath(`/unidades/${unidadeId}/configuracoes`)
-  return { success: true }
+  return { success: true, id: created.id as string }
 }
 
 export async function updateColunaCustomizada(
@@ -220,5 +222,47 @@ export async function deleteUnidade(unidadeId: string, password: string) {
   if (error) return { error: 'Erro ao excluir unidade.' }
 
   revalidatePath('/unidades')
+  return { success: true }
+}
+
+export async function saveColunasLayout(unidadeId: string, layout: string[]) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const role = user.user_metadata?.role ?? 'executor'
+  if (role !== 'defensor') return { error: 'Sem permissão.' }
+
+  const { error } = await supabase
+    .from('unidades')
+    .update({ colunas_layout: layout })
+    .eq('id', unidadeId)
+    .eq('defensor_id', user.id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath(`/unidades/${unidadeId}`)
+  revalidatePath(`/unidades/${unidadeId}/configuracoes`)
+  return { success: true }
+}
+
+export async function deleteColunaCustomizada(colunaId: string, unidadeId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const role = user.user_metadata?.role ?? 'executor'
+  if (role !== 'defensor') return { error: 'Sem permissão.' }
+
+  const { error } = await supabase
+    .from('colunas_customizadas')
+    .update({ ativo: false })
+    .eq('id', colunaId)
+    .eq('unidade_id', unidadeId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath(`/unidades/${unidadeId}`)
+  revalidatePath(`/unidades/${unidadeId}/configuracoes`)
   return { success: true }
 }

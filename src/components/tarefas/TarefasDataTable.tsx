@@ -15,6 +15,7 @@ import {
 } from '@tanstack/react-table'
 import { ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Pencil, Trash2, CheckSquare, RotateCcw } from 'lucide-react'
 import type { Tarefa, ColunaCustomizada } from '@/types'
+import { buildEffectiveLayout, isDefaultColumnKey } from '@/lib/config/colunas'
 import { getRowClass, getUrgencyLevel } from '@/lib/utils/prazoStatus'
 import { isoToDisplay } from '@/lib/utils/dateMask'
 import { TarefaStatusBadge } from './TarefaStatusBadge'
@@ -34,6 +35,7 @@ import Link from 'next/link'
 interface TarefasDataTableProps {
   tarefas: Tarefa[]
   colunas: ColunaCustomizada[]
+  colunasLayout: string[] | null
   unidadeId: string
   userRole: 'defensor' | 'gestor' | 'executor'
   currentUserId: string
@@ -69,6 +71,7 @@ function SortableHeader({
 export function TarefasDataTable({
   tarefas,
   colunas,
+  colunasLayout,
   unidadeId,
   userRole,
   currentUserId,
@@ -123,26 +126,25 @@ export function TarefasDataTable({
 
   // Build column definitions
   const columns = useMemo<ColumnDef<Tarefa>[]>(() => {
-    const fixedColumns: ColumnDef<Tarefa>[] = [
-      {
+    // All default column defs keyed by identifier
+    const defaultColDefs: Record<string, ColumnDef<Tarefa>> = {
+      numero_processo: {
         accessorKey: 'numero_processo',
-        header: ({ column }) => (
-          <SortableHeader column={column} label="Nº Processo" />
-        ),
+        header: ({ column }) => <SortableHeader column={column} label="Nº Processo" />,
         cell: ({ row }) => (
           <span className="font-mono text-xs font-medium text-gray-700">
             {row.original.numero_processo}
           </span>
         ),
       },
-      {
+      assistido: {
         accessorKey: 'assistido',
         header: ({ column }) => <SortableHeader column={column} label="Assistido" />,
         cell: ({ row }) => (
           <span className="font-medium text-gray-900">{row.original.assistido}</span>
         ),
       },
-      {
+      tipo_tarefa: {
         accessorKey: 'tipo_tarefa',
         header: 'Tipo',
         cell: ({ row }) => (
@@ -155,7 +157,7 @@ export function TarefasDataTable({
           return row.original.tipo_tarefa?.id === filterValue
         },
       },
-      {
+      prazo_final_pje: {
         accessorKey: 'prazo_final_pje',
         header: ({ column }) => <SortableHeader column={column} label="Prazo PJE" />,
         cell: ({ row }) => (
@@ -164,7 +166,7 @@ export function TarefasDataTable({
           </span>
         ),
       },
-      {
+      prazo_interno: {
         accessorKey: 'prazo_interno',
         header: ({ column }) => <SortableHeader column={column} label="Prazo Interno" />,
         cell: ({ row }) => {
@@ -188,7 +190,7 @@ export function TarefasDataTable({
           new Date(a.original.prazo_interno).getTime() -
           new Date(b.original.prazo_interno).getTime(),
       },
-      {
+      executor: {
         accessorKey: 'executor',
         header: 'Executor',
         cell: ({ row }) => (
@@ -201,7 +203,7 @@ export function TarefasDataTable({
           return row.original.executor_id === filterValue
         },
       },
-      {
+      status: {
         id: 'status',
         header: 'Status',
         cell: ({ row }) => <TarefaStatusBadge tarefa={row.original} />,
@@ -210,24 +212,35 @@ export function TarefasDataTable({
           return row.original.status === filterValue
         },
       },
-    ]
+    }
 
-    // Dynamic custom columns
-    const dynamicColumns: ColumnDef<Tarefa>[] = colunas
-      .filter((c) => c.ativo)
-      .sort((a, b) => a.ordem - b.ordem)
-      .map((coluna) => ({
-        id: `custom_${coluna.id}`,
-        header: coluna.nome,
-        cell: ({ row }) => {
-          const valor = row.original.valores_customizados?.find(
-            (v) => v.coluna_id === coluna.id
-          )?.valor
-          return (
-            <span className="text-sm text-gray-600">{valor ?? '—'}</span>
-          )
-        },
-      }))
+    // Build ordered column list from layout
+    const activeCustomColunas = colunas.filter((c) => c.ativo)
+    const effectiveLayout = buildEffectiveLayout(
+      colunasLayout,
+      activeCustomColunas.sort((a, b) => a.ordem - b.ordem).map((c) => c.id)
+    )
+
+    const orderedColumns: ColumnDef<Tarefa>[] = []
+    for (const key of effectiveLayout) {
+      if (isDefaultColumnKey(key)) {
+        if (defaultColDefs[key]) orderedColumns.push(defaultColDefs[key])
+      } else {
+        const coluna = activeCustomColunas.find((c) => c.id === key)
+        if (coluna) {
+          orderedColumns.push({
+            id: `custom_${coluna.id}`,
+            header: coluna.nome,
+            cell: ({ row }) => {
+              const valor = row.original.valores_customizados?.find(
+                (v) => v.coluna_id === coluna.id
+              )?.valor
+              return <span className="text-sm text-gray-600">{valor ?? '—'}</span>
+            },
+          })
+        }
+      }
+    }
 
     // Actions column
     const actionsColumn: ColumnDef<Tarefa> = {
@@ -335,8 +348,8 @@ export function TarefasDataTable({
       },
     }
 
-    return [...fixedColumns, ...dynamicColumns, actionsColumn]
-  }, [colunas, unidadeId, userRole, currentUserId, loadingIds])
+    return [...orderedColumns, actionsColumn]
+  }, [colunas, colunasLayout, unidadeId, userRole, currentUserId, loadingIds])
 
   const table = useReactTable({
     data: tarefas,

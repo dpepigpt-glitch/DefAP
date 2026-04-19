@@ -8,7 +8,7 @@ import { DeleteUnidadeSection } from '@/components/unidades/DeleteUnidadeSection
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Settings, History } from 'lucide-react'
-import type { TipoTarefa, ColunaCustomizada, UnidadeMembro, CampoLabel } from '@/types'
+import type { TipoTarefa, ColunaCustomizada, UnidadeMembro, CampoLabel, Unidade } from '@/types'
 
 interface PageProps {
   params: { unidadeId: string }
@@ -74,7 +74,7 @@ export default async function ConfiguracoesPage({ params }: PageProps) {
       />
 
       <ColunasManager
-        unidadeId={unidadeId}
+        unidade={unidadeResult.data as unknown as Unidade}
         colunas={(colunasResult.data ?? []) as ColunaCustomizada[]}
       />
 
