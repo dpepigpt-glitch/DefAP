@@ -51,8 +51,8 @@ export function UnidadePageHeader({ unidade, tarefas, activeFilter, onFilterClic
   return (
     <div>
       <div className="flex items-center gap-3 mb-4">
-        <div className="bg-blue-100 p-2 rounded-lg">
-          <Building2 className="h-5 w-5 text-blue-600" />
+        <div className="bg-green-100 p-2 rounded-lg">
+          <Building2 className="h-5 w-5 text-green-700" />
         </div>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{unidade.nome}</h1>

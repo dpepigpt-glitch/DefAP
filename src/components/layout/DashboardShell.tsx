@@ -28,8 +28,13 @@ export function DashboardShell({ profile, children }: DashboardShellProps) {
       {/* Main content area */}
       <div className="ml-64">
         {/* Topbar */}
-        <header className="sticky top-0 z-30 bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
-          <div />
+        <header className="sticky top-0 z-30 bg-white border-b border-green-100 px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="w-1 h-6 rounded-full bg-green-600 inline-block" />
+            <span className="text-sm font-semibold text-green-800 tracking-wide">
+              Defensoria Pública
+            </span>
+          </div>
           <div className="flex items-center gap-3">
             {profile && <NotificationBell userId={profile.id} />}
           </div>
