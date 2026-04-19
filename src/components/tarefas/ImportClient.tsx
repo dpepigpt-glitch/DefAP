@@ -23,6 +23,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   Users,
+  FileText,
 } from 'lucide-react'
 
 const COLUMN_MAP: Record<string, string> = {
@@ -61,6 +62,33 @@ const COLUMN_MAP: Record<string, string> = {
   'prazo interno': 'prazo_interno',
   'protocolo': 'status_raw',
   'status': 'status_raw',
+}
+
+const PETICAO_NORMALIZE: Record<string, string> = {
+  'ra': 'Resposta',
+  'r.a': 'Resposta',
+  'r.a.': 'Resposta',
+  'resposta': 'Resposta',
+  'contrirazoes': 'Contrarrazões',
+  'contrarrazoes': 'Contrarrazões',
+  'contrarrazão': 'Contrarrazões',
+  'contrarrazao': 'Contrarrazões',
+  'contrarrazões': 'Contrarrazões',
+  'embargos de declaração': 'Embargos de Declaração',
+  'embargos de declaracao': 'Embargos de Declaração',
+  'embargos declaracao': 'Embargos de Declaração',
+  'embargo de declaração': 'Embargos de Declaração',
+  'apelação': 'Apelação',
+  'apelacao': 'Apelação',
+  'recurso de apelação': 'Recurso de Apelação',
+  'recurso de apelacao': 'Recurso de Apelação',
+  'petição inicial': 'Petição Inicial',
+  'peticao inicial': 'Petição Inicial',
+}
+
+function normalizePeticaoName(val: string): string {
+  const lower = val.toLowerCase().trim()
+  return PETICAO_NORMALIZE[lower] ?? toTitleCase(val)
 }
 
 function parseStatusRaw(val: string): 'pendente' | 'remetido_ao_defensor' | 'protocolado' {
@@ -110,12 +138,18 @@ export interface Profile {
   email: string
 }
 
+export interface TipoTarefaOption {
+  id: string
+  nome: string
+}
+
 interface ImportClientProps {
   unidadeId: string
   profiles: Profile[]
+  tiposTarefa: TipoTarefaOption[]
 }
 
-export function ImportClient({ unidadeId, profiles }: ImportClientProps) {
+export function ImportClient({ unidadeId, profiles, tiposTarefa }: ImportClientProps) {
   const router = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -125,9 +159,13 @@ export function ImportClient({ unidadeId, profiles }: ImportClientProps) {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<{ inserted: number; errors: { row: number; message: string }[] } | null>(null)
 
-  // Executor mapping state
+  // Executor mapping: name from file → profile_id
   const [executorNames, setExecutorNames] = useState<string[]>([])
   const [executorMap, setExecutorMap] = useState<Record<string, string>>({})
+
+  // Petition type mapping: normalized name from file → tipo_tarefa_id
+  const [peticaoNames, setPeticaoNames] = useState<string[]>([])
+  const [peticaoMap, setPeticaoMap] = useState<Record<string, string>>({})
 
   async function parseFile(file: File): Promise<{ rows: ParsedRow[]; hdrs: string[] }> {
     if (file.name.endsWith('.csv') || file.name.endsWith('.txt')) {
@@ -168,18 +206,32 @@ export function ImportClient({ unidadeId, profiles }: ImportClientProps) {
       setHeaders(hdrs)
       setPreview(rows.slice(0, 5))
 
-      // Extract unique non-empty executor names from the file
-      const names = new Set<string>()
+      // Collect unique executor names
+      const execNames = new Set<string>()
+      // Collect unique petition type names (normalized)
+      const petNames = new Set<string>()
+
       rows.forEach((row) => {
         Object.entries(row).forEach(([key, val]) => {
           const mk = COLUMN_MAP[key.toLowerCase().trim()]
-          if (mk === 'executor_nome' && val && val.trim()) {
-            names.add(val.trim())
-          }
+          if (!val || !val.trim()) return
+          if (mk === 'executor_nome') execNames.add(val.trim())
+          if (mk === 'tipo_peticao_nome') petNames.add(normalizePeticaoName(val.trim()))
         })
       })
-      setExecutorNames(Array.from(names).sort())
+
+      setExecutorNames(Array.from(execNames).sort())
       setExecutorMap({})
+      setPeticaoNames(Array.from(petNames).sort())
+      // Auto-match petition types by exact name
+      const autoMap: Record<string, string> = {}
+      petNames.forEach((name) => {
+        const match = tiposTarefa.find(
+          (t) => t.nome.toLowerCase() === name.toLowerCase()
+        )
+        if (match) autoMap[name] = match.id
+      })
+      setPeticaoMap(autoMap)
     } catch (e) {
       console.error('Error parsing file:', e)
     }
@@ -187,7 +239,8 @@ export function ImportClient({ unidadeId, profiles }: ImportClientProps) {
 
   function rowToPayload(
     row: ParsedRow,
-    map: Record<string, string>,
+    execMap: Record<string, string>,
+    petMap: Record<string, string>,
   ): Omit<TarefaPayload, 'unidade_id'> {
     const mapped: Record<string, string> = {}
     Object.entries(row).forEach(([key, val]) => {
@@ -219,9 +272,18 @@ export function ImportClient({ unidadeId, profiles }: ImportClientProps) {
       status: parseStatusRaw(mapped.status_raw ?? ''),
     }
 
+    // Resolve executor from mapping
     const executorNome = (mapped.executor_nome ?? '').trim()
-    if (executorNome && map[executorNome]) {
-      payload.executor_id = map[executorNome]
+    if (executorNome && execMap[executorNome]) {
+      payload.executor_id = execMap[executorNome]
+    }
+
+    // Resolve petition type from mapping
+    if (mapped.tipo_peticao_nome) {
+      const normalized = normalizePeticaoName(mapped.tipo_peticao_nome)
+      if (petMap[normalized]) {
+        payload.tipo_tarefa_id = petMap[normalized]
+      }
     }
 
     if (inicioISO) payload.inicio = inicioISO
@@ -246,7 +308,7 @@ export function ImportClient({ unidadeId, profiles }: ImportClientProps) {
           })
           return (mapped.numero_processo ?? '').trim() !== ''
         })
-        .map((row) => rowToPayload(row, executorMap))
+        .map((row) => rowToPayload(row, executorMap, peticaoMap))
 
       const importResult = await importarTarefas(unidadeId, payloads)
       setResult(importResult)
@@ -369,6 +431,7 @@ export function ImportClient({ unidadeId, profiles }: ImportClientProps) {
         </CardContent>
       </Card>
 
+      {/* Executor mapping — only shown when file has executor names */}
       {executorNames.length > 0 && (
         <Card>
           <CardHeader>
@@ -388,17 +451,14 @@ export function ImportClient({ unidadeId, profiles }: ImportClientProps) {
                   <span className="text-sm font-medium text-gray-700 w-40 shrink-0 truncate" title={name}>
                     {name}
                   </span>
-                  <span className="text-gray-400 text-sm">→</span>
+                  <span className="text-gray-400 text-sm shrink-0">→</span>
                   <Select
                     value={executorMap[name] ?? '__none__'}
                     onValueChange={(val) =>
                       setExecutorMap((prev) => {
                         const next = { ...prev }
-                        if (val === '__none__') {
-                          delete next[name]
-                        } else {
-                          next[name] = val
-                        }
+                        if (val === '__none__') delete next[name]
+                        else next[name] = val
                         return next
                       })
                     }
@@ -411,6 +471,57 @@ export function ImportClient({ unidadeId, profiles }: ImportClientProps) {
                       {profiles.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
                           {p.full_name} ({p.email})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Petition type mapping — only shown when file has petition names AND unit has tipos */}
+      {peticaoNames.length > 0 && tiposTarefa.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileText className="h-5 w-5 text-purple-600" />
+              Mapear Tipos de Petição
+            </CardTitle>
+            <CardDescription>
+              Associe cada tipo da planilha a um tipo de petição cadastrado.
+              Correspondências exatas foram preenchidas automaticamente.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {peticaoNames.map((name) => (
+                <div key={name} className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-gray-700 w-40 shrink-0 truncate" title={name}>
+                    {name}
+                  </span>
+                  <span className="text-gray-400 text-sm shrink-0">→</span>
+                  <Select
+                    value={peticaoMap[name] ?? '__none__'}
+                    onValueChange={(val) =>
+                      setPeticaoMap((prev) => {
+                        const next = { ...prev }
+                        if (val === '__none__') delete next[name]
+                        else next[name] = val
+                        return next
+                      })
+                    }
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Selecionar tipo..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— sem tipo —</SelectItem>
+                      {tiposTarefa.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.nome}
                         </SelectItem>
                       ))}
                     </SelectContent>

@@ -15,14 +15,28 @@ export default async function ImportarPage({ params }: PageProps) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // Two-step fetch to avoid subquery issues with Supabase types
   const { data: membros } = await supabase
     .from('unidade_membros')
-    .select('profile_id, profiles!profile_id(id, full_name, email)')
+    .select('profile_id')
     .eq('unidade_id', unidadeId)
 
-  const profiles = (membros ?? [])
-    .map((m) => m.profiles as { id: string; full_name: string; email: string } | null)
-    .filter((p): p is { id: string; full_name: string; email: string } => p !== null)
+  const memberIds = (membros ?? []).map((m) => m.profile_id)
+
+  const [profilesResult, tiposResult] = await Promise.all([
+    memberIds.length > 0
+      ? supabase.from('profiles').select('id, full_name, email').in('id', memberIds)
+      : Promise.resolve({ data: [] }),
+    supabase
+      .from('tipos_tarefa')
+      .select('id, nome')
+      .eq('unidade_id', unidadeId)
+      .eq('ativo', true)
+      .order('nome', { ascending: true }),
+  ])
+
+  const profiles = (profilesResult.data ?? []) as { id: string; full_name: string; email: string }[]
+  const tiposTarefa = (tiposResult.data ?? []) as { id: string; nome: string }[]
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -39,7 +53,7 @@ export default async function ImportarPage({ params }: PageProps) {
         </div>
       </div>
 
-      <ImportClient unidadeId={unidadeId} profiles={profiles} />
+      <ImportClient unidadeId={unidadeId} profiles={profiles} tiposTarefa={tiposTarefa} />
     </div>
   )
 }
