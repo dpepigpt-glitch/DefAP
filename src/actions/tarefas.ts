@@ -295,7 +295,7 @@ export async function importarTarefas(
         assistido: toTitleCase(row.assistido),
         created_by: user.id,
         ...(row.status === 'protocolado'
-          ? { protocolado_at: now, protocolado_by: user.id }
+          ? { protocolado_at: row.prazo_interno, protocolado_by: user.id }
           : {}),
         ...(row.status === 'remetido_ao_defensor' ? { remetido_at: now } : {}),
       })
