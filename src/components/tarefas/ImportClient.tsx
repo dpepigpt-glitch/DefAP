@@ -206,7 +206,7 @@ export function ImportClient({ unidadeId, profiles, tiposTarefa }: ImportClientP
       setHeaders(hdrs)
       setPreview(rows.slice(0, 5))
 
-      // Collect unique executor names
+      // Collect unique executor names; blank cells → 'Estagiário não Informado'
       const execNames = new Set<string>()
       // Collect unique petition type names (normalized)
       const petNames = new Set<string>()
@@ -214,9 +214,12 @@ export function ImportClient({ unidadeId, profiles, tiposTarefa }: ImportClientP
       rows.forEach((row) => {
         Object.entries(row).forEach(([key, val]) => {
           const mk = COLUMN_MAP[key.toLowerCase().trim()]
-          if (!val || !val.trim()) return
-          if (mk === 'executor_nome') execNames.add(val.trim())
-          if (mk === 'tipo_peticao_nome') petNames.add(normalizePeticaoName(val.trim()))
+          if (mk === 'executor_nome') {
+            execNames.add(val && val.trim() ? val.trim() : 'Estagiário não Informado')
+          }
+          if (mk === 'tipo_peticao_nome' && val && val.trim()) {
+            petNames.add(normalizePeticaoName(val.trim()))
+          }
         })
       })
 
@@ -272,9 +275,9 @@ export function ImportClient({ unidadeId, profiles, tiposTarefa }: ImportClientP
       status: parseStatusRaw(mapped.status_raw ?? ''),
     }
 
-    // Resolve executor from mapping
-    const executorNome = (mapped.executor_nome ?? '').trim()
-    if (executorNome && execMap[executorNome]) {
+    // Resolve executor from mapping; blank cells use 'Estagiário não Informado' as key
+    const executorNome = (mapped.executor_nome ?? '').trim() || 'Estagiário não Informado'
+    if (execMap[executorNome]) {
       payload.executor_id = execMap[executorNome]
     }
 

@@ -297,65 +297,74 @@ export function ColunasManager({ unidade, colunas: initialColunas }: ColunasMana
 
         {/* Column list */}
         <div className="divide-y divide-gray-100 border rounded-lg overflow-hidden">
-          {layout.map((item, index) => (
-            <div
-              key={itemId(item)}
-              className="flex items-center gap-2 px-3 py-2.5 hover:bg-gray-50 bg-white"
-            >
-              {/* Move buttons */}
-              <div className="flex flex-col shrink-0">
-                <button
-                  onClick={() => moveUp(index)}
-                  disabled={index === 0}
-                  className="text-gray-300 hover:text-gray-600 disabled:opacity-20 disabled:cursor-not-allowed p-0.5"
-                >
-                  <ChevronUp className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  onClick={() => moveDown(index)}
-                  disabled={index === layout.length - 1}
-                  className="text-gray-300 hover:text-gray-600 disabled:opacity-20 disabled:cursor-not-allowed p-0.5"
-                >
-                  <ChevronDown className="h-3.5 w-3.5" />
-                </button>
-              </div>
+          {layout.map((item, index) => {
+            const isFixed = item.kind === 'default' && item.key === 'status'
+            return (
+              <div
+                key={itemId(item)}
+                className={`flex items-center gap-2 px-3 py-2.5 bg-white ${isFixed ? 'opacity-60' : 'hover:bg-gray-50'}`}
+              >
+                {/* Move buttons */}
+                <div className="flex flex-col shrink-0">
+                  <button
+                    onClick={() => moveUp(index)}
+                    disabled={index === 0 || isFixed}
+                    className="text-gray-300 hover:text-gray-600 disabled:opacity-20 disabled:cursor-not-allowed p-0.5"
+                  >
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => moveDown(index)}
+                    disabled={index === layout.length - 1 || isFixed}
+                    className="text-gray-300 hover:text-gray-600 disabled:opacity-20 disabled:cursor-not-allowed p-0.5"
+                  >
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </button>
+                </div>
 
-              {/* Column info */}
-              <div className="flex-1 flex items-center gap-2 min-w-0">
-                <span className="text-sm font-medium text-gray-900 truncate">
-                  {itemLabel(item)}
-                </span>
-                {item.kind === 'default' ? (
-                  <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full shrink-0">
-                    Padrão
+                {/* Column info */}
+                <div className="flex-1 flex items-center gap-2 min-w-0">
+                  <span className="text-sm font-medium text-gray-900 truncate">
+                    {itemLabel(item)}
                   </span>
+                  {isFixed ? (
+                    <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full shrink-0">
+                      Fixo
+                    </span>
+                  ) : item.kind === 'default' ? (
+                    <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full shrink-0">
+                      Padrão
+                    </span>
+                  ) : (
+                    <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full shrink-0">
+                      {TIPO_LABELS[item.coluna.tipo]}
+                    </span>
+                  )}
+                </div>
+
+                {/* Remove/delete button — hidden for fixed columns */}
+                {isFixed ? (
+                  <div className="w-6 h-6 shrink-0" />
+                ) : item.kind === 'default' ? (
+                  <button
+                    onClick={() => removeItem(index)}
+                    className="text-gray-300 hover:text-red-500 transition-colors shrink-0 p-1"
+                    title="Remover desta unidade"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 ) : (
-                  <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full shrink-0">
-                    {TIPO_LABELS[item.coluna.tipo]}
-                  </span>
+                  <button
+                    onClick={() => handleDeleteCustom(item as ColumnItem & { kind: 'custom' }, index)}
+                    className="text-gray-300 hover:text-red-500 transition-colors shrink-0 p-1"
+                    title="Excluir coluna"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 )}
               </div>
-
-              {/* Remove/delete button */}
-              {item.kind === 'default' ? (
-                <button
-                  onClick={() => removeItem(index)}
-                  className="text-gray-300 hover:text-red-500 transition-colors shrink-0 p-1"
-                  title="Remover desta unidade"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              ) : (
-                <button
-                  onClick={() => handleDeleteCustom(item as ColumnItem & { kind: 'custom' }, index)}
-                  className="text-gray-300 hover:text-red-500 transition-colors shrink-0 p-1"
-                  title="Excluir coluna"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-          ))}
+            )
+          })}
 
           {/* Actions column (always last, not moveable) */}
           <div className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 opacity-50">

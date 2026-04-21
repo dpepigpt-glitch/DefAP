@@ -29,6 +29,10 @@ export function buildEffectiveLayout(
   colunasLayout: string[] | null,
   customIds: string[],
 ): string[] {
-  if (colunasLayout && colunasLayout.length > 0) return colunasLayout
-  return [...DEFAULT_COLUMN_KEYS, ...customIds]
+  if (!colunasLayout || colunasLayout.length === 0) {
+    return [...DEFAULT_COLUMN_KEYS, ...customIds]
+  }
+  // Append any custom columns created after the layout was last saved
+  const missing = customIds.filter((id) => !colunasLayout.includes(id))
+  return missing.length > 0 ? [...colunasLayout, ...missing] : colunasLayout
 }
