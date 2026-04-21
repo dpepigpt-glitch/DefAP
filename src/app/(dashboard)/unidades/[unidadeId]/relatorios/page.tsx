@@ -32,13 +32,12 @@ export default async function RelatoriosPage({ params }: PageProps) {
     .eq('id', unidadeId)
     .single()
 
-  // Get all remetidas + protocoladas tasks (badge is based on remetido_at)
+  // Get all remetidas + protocoladas tasks
   const { data: tarefas } = await supabase
     .from('tarefas')
     .select('*, executor:profiles!executor_id(id, full_name, email)')
     .eq('unidade_id', unidadeId)
     .in('status', ['remetido_ao_defensor', 'protocolado'])
-    .not('remetido_at', 'is', null)
 
   const typedTarefas = (tarefas ?? []) as unknown as Tarefa[]
 
@@ -62,9 +61,10 @@ export default async function RelatoriosPage({ params }: PageProps) {
       executor: entry.executor!,
       tarefas: entry.tarefas,
       total: entry.tarefas.length,
-      noPrazo: entry.tarefas.filter(
-        (t) => t.remetido_at && new Date(t.remetido_at) <= new Date(t.prazo_interno)
-      ).length,
+      noPrazo: entry.tarefas.filter((t) => {
+        const done = t.remetido_at ?? t.protocolado_at
+        return done && new Date(done) <= new Date(t.prazo_interno)
+      }).length,
       selo: calcularSelo(entry.tarefas),
     }))
     .sort((a, b) => {
@@ -109,7 +109,7 @@ export default async function RelatoriosPage({ params }: PageProps) {
                 </p>
                 <p className="text-sm text-gray-600">{SELO_DESCRIPTION[seloGeral]}</p>
                 <p className="text-xs text-gray-400 mt-1">
-                  Baseado em {typedTarefas.length} tarefa{typedTarefas.length !== 1 ? 's' : ''} protocolada{typedTarefas.length !== 1 ? 's' : ''}
+                  Baseado em {typedTarefas.length} tarefa{typedTarefas.length !== 1 ? 's' : ''} concluída{typedTarefas.length !== 1 ? 's' : ''}
                 </p>
               </div>
             </div>

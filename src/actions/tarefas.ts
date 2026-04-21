@@ -286,6 +286,7 @@ export async function importarTarefas(
       continue
     }
 
+    const now = new Date().toISOString()
     const { data: tarefa, error } = await supabase
       .from('tarefas')
       .insert({
@@ -293,6 +294,10 @@ export async function importarTarefas(
         unidade_id: unidadeId,
         assistido: toTitleCase(row.assistido),
         created_by: user.id,
+        ...(row.status === 'protocolado'
+          ? { protocolado_at: now, protocolado_by: user.id }
+          : {}),
+        ...(row.status === 'remetido_ao_defensor' ? { remetido_at: now } : {}),
       })
       .select('id')
       .single()
