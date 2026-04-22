@@ -224,10 +224,24 @@ export function ImportClient({ unidadeId, profiles, tiposTarefa }: ImportClientP
         const sheet = workbook.Sheets[sheetName]
         const data = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1 }) as unknown[][]
         if (data.length < 2) continue
-        const sheetHdrs = (data[0] as unknown[]).map((h) => cellToString(h).toLowerCase().trim())
+
+        // Find the real header row — some tabs have a title row before the column headers.
+        // Search up to row 5 for the first row that contains a recognised column identifier.
+        const KEY_IDENTIFIERS = ['processo', 'assistido', 'nome', 'acusado', 'expedição', 'expedicao']
+        let headerRowIdx = -1
+        for (let r = 0; r < Math.min(data.length, 6); r++) {
+          const hasKey = (data[r] as unknown[]).some((cell) => {
+            const s = cellToString(cell).toLowerCase().trim()
+            return KEY_IDENTIFIERS.some((k) => s === k || s.includes('processo'))
+          })
+          if (hasKey) { headerRowIdx = r; break }
+        }
+        if (headerRowIdx === -1) continue // no header found in this sheet
+
+        const sheetHdrs = (data[headerRowIdx] as unknown[]).map((h) => cellToString(h).toLowerCase().trim())
         if (firstHdrs.length === 0) firstHdrs = sheetHdrs
 
-        const sheetRows = data.slice(1).map((row) => {
+        const sheetRows = data.slice(headerRowIdx + 1).map((row) => {
           const obj: ParsedRow = {}
           sheetHdrs.forEach((h, i) => { obj[h] = cellToString((row as unknown[])[i]) })
           return obj
@@ -455,12 +469,13 @@ export function ImportClient({ unidadeId, profiles, tiposTarefa }: ImportClientP
               )}
               {result.errors.length > 0 && (
                 <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                  <div className="flex items-center gap-2 font-medium mb-1">
+                  <div className="flex items-center gap-2 font-medium mb-2">
                     <AlertTriangle className="h-4 w-4" />
-                    {result.errors.length} erro{result.errors.length !== 1 ? 's' : ''}:
+                    {result.errors.length} linha{result.errors.length !== 1 ? 's' : ''} ignorada{result.errors.length !== 1 ? 's' : ''}
+                    {result.inserted > 0 && ` (${result.inserted + result.errors.length} linhas lidas no total)`}:
                   </div>
-                  <ul className="list-disc list-inside space-y-0.5 text-xs">
-                    {result.errors.slice(0, 5).map((e, i) => <li key={i}>{e.message}</li>)}
+                  <ul className="list-disc list-inside space-y-0.5 text-xs max-h-40 overflow-y-auto pr-1">
+                    {result.errors.map((e, i) => <li key={i}>{e.message}</li>)}
                   </ul>
                 </div>
               )}

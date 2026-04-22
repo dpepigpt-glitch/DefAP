@@ -224,7 +224,7 @@ export function TarefasDataTable({
         header: 'Executor',
         cell: ({ row }) => (
           <span className="text-sm text-gray-600">
-            {row.original.executor?.full_name ?? '—'}
+            {row.original.executor?.full_name ?? 'Estagiário não Informado'}
           </span>
         ),
         filterFn: (row, _id, filterValue) => {
