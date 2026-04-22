@@ -558,45 +558,64 @@ export function ImportClient({ unidadeId, profiles, tiposTarefa }: ImportClientP
             <CardTitle className="text-base flex items-center gap-2">
               <FileText className="h-5 w-5 text-purple-600" />
               Mapear Tipos de Petição
+              {peticaoNames.filter((n) => !peticaoMap[n]).length > 0 && (
+                <span className="ml-auto text-xs font-normal text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                  {peticaoNames.filter((n) => !peticaoMap[n]).length} sem vínculo
+                </span>
+              )}
             </CardTitle>
             <CardDescription>
-              Associe cada tipo da planilha a um tipo de petição cadastrado.
-              Correspondências exatas foram preenchidas automaticamente.
+              Vincule cada nome encontrado na planilha a um tipo cadastrado aqui no sistema.
+              Vários nomes da planilha podem apontar para o mesmo tipo — por exemplo,
+              &ldquo;Razões simples&rdquo;, &ldquo;Razões com absolvição&rdquo; e &ldquo;Razões e Contrarrazões&rdquo;
+              podem todos ser mapeados como <strong>Razões de Apelação</strong>.
+              Itens sem vínculo serão importados sem tipo de petição.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {peticaoNames.map((name) => (
-                <div key={name} className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-gray-700 w-40 shrink-0 truncate" title={name}>
-                    {name}
-                  </span>
-                  <span className="text-gray-400 text-sm shrink-0">→</span>
-                  <Select
-                    value={peticaoMap[name] ?? '__none__'}
-                    onValueChange={(val) =>
-                      setPeticaoMap((prev) => {
-                        const next = { ...prev }
-                        if (val === '__none__') delete next[name]
-                        else next[name] = val
-                        return next
-                      })
-                    }
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Selecionar tipo..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">— sem tipo —</SelectItem>
-                      {tiposTarefa.map((t) => (
-                        <SelectItem key={t.id} value={t.id}>
-                          {t.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ))}
+            <div className="divide-y divide-gray-100 border rounded-lg overflow-hidden">
+              {peticaoNames.map((name) => {
+                const isMapped = !!peticaoMap[name]
+                return (
+                  <div key={name} className={`p-3 space-y-2 ${isMapped ? 'bg-white' : 'bg-amber-50'}`}>
+                    <div className="flex items-start gap-2">
+                      <span className={`inline-block text-xs font-medium px-2 py-1 rounded leading-snug break-all ${
+                        isMapped
+                          ? 'bg-purple-50 text-purple-800 border border-purple-200'
+                          : 'bg-amber-100 text-amber-800 border border-amber-300'
+                      }`}>
+                        {name}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400 text-sm shrink-0">↳</span>
+                      <Select
+                        value={peticaoMap[name] ?? '__none__'}
+                        onValueChange={(val) =>
+                          setPeticaoMap((prev) => {
+                            const next = { ...prev }
+                            if (val === '__none__') delete next[name]
+                            else next[name] = val
+                            return next
+                          })
+                        }
+                      >
+                        <SelectTrigger className={`flex-1 text-sm ${!isMapped ? 'border-amber-300' : ''}`}>
+                          <SelectValue placeholder="Selecionar tipo cadastrado..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">— importar sem tipo —</SelectItem>
+                          {tiposTarefa.map((t) => (
+                            <SelectItem key={t.id} value={t.id}>
+                              {t.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </CardContent>
         </Card>
