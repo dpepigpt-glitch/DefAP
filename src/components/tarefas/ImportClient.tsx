@@ -150,14 +150,28 @@ function cellToDateString(val: unknown): string {
     const date = new Date(Math.round((serial - 25569) * 86400 * 1000))
     return `${String(date.getUTCDate()).padStart(2,'0')}/${String(date.getUTCMonth()+1).padStart(2,'0')}/${date.getUTCFullYear()}`
   }
+  // ISO: YYYY-MM-DD
   const iso = str.match(/^(\d{4})-(\d{2})-(\d{2})/)
   if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`
-  const parts = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
-  if (parts) {
-    const [, a, b, y] = parts
+  // DD/MM/YYYY or MM/DD/YYYY
+  const slash = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (slash) {
+    const [, a, b, y] = slash
     const ap = a.padStart(2,'0'), bp = b.padStart(2,'0')
     if (parseInt(b) > 12) return `${bp}/${ap}/${y}`
     return `${ap}/${bp}/${y}`
+  }
+  // DD-MM-YYYY or DD.MM.YYYY (common in Brazilian spreadsheets)
+  const dash = str.match(/^(\d{1,2})[-.](\d{1,2})[-.](\d{4})$/)
+  if (dash) {
+    const [, d, m, y] = dash
+    return `${d.padStart(2,'0')}/${m.padStart(2,'0')}/${y}`
+  }
+  // DD/MM/YY (2-digit year)
+  const short = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/)
+  if (short) {
+    const [, d, m, y] = short
+    return `${d.padStart(2,'0')}/${m.padStart(2,'0')}/20${y}`
   }
   return str
 }
@@ -194,6 +208,7 @@ export function ImportClient({ unidadeId, profiles, tiposTarefa }: ImportClientP
   const [fileName, setFileName] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<{ inserted: number; errors: { row: number; message: string }[] } | null>(null)
+  const [parseStats, setParseStats] = useState<{ totalInFile: number; withProcesso: number } | null>(null)
 
   // Executor mapping: name from file → profile_id
   const [executorNames, setExecutorNames] = useState<string[]>([])
@@ -367,16 +382,16 @@ export function ImportClient({ unidadeId, profiles, tiposTarefa }: ImportClientP
 
     try {
       const { rows } = await parseFile(file)
-      const payloads = rows
-        .filter((row) => {
-          const mapped: Record<string, string> = {}
-          Object.entries(row).forEach(([k, v]) => {
-            const mk = COLUMN_MAP[normalizeHeader(k)]
-            if (mk) mapped[mk] = v
-          })
-          return (mapped.numero_processo ?? '').trim() !== ''
+      const rowsWithProcesso = rows.filter((row) => {
+        const mapped: Record<string, string> = {}
+        Object.entries(row).forEach(([k, v]) => {
+          const mk = COLUMN_MAP[normalizeHeader(k)]
+          if (mk) mapped[mk] = v
         })
-        .map((row) => rowToPayload(row, executorMap, peticaoMap))
+        return (mapped.numero_processo ?? '').trim() !== ''
+      })
+      setParseStats({ totalInFile: rows.length, withProcesso: rowsWithProcesso.length })
+      const payloads = rowsWithProcesso.map((row) => rowToPayload(row, executorMap, peticaoMap))
 
       const importResult = await importarTarefas(unidadeId, payloads)
       setResult(importResult)
@@ -467,6 +482,19 @@ export function ImportClient({ unidadeId, profiles, tiposTarefa }: ImportClientP
             </div>
           )}
 
+          {parseStats && (
+            <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 space-y-0.5">
+              <div>📄 Linhas no arquivo: <strong>{parseStats.totalInFile}</strong></div>
+              <div>🔢 Com número de processo: <strong>{parseStats.withProcesso}</strong></div>
+              {parseStats.totalInFile > parseStats.withProcesso && (
+                <div className="text-amber-600">
+                  ⚠️ {parseStats.totalInFile - parseStats.withProcesso} linhas sem processo foram ignoradas
+                  (linhas em branco, cabeçalhos extras, etc.)
+                </div>
+              )}
+            </div>
+          )}
+
           {result && (
             <div className="space-y-2">
               {result.inserted > 0 && (
@@ -479,8 +507,7 @@ export function ImportClient({ unidadeId, profiles, tiposTarefa }: ImportClientP
                 <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
                   <div className="flex items-center gap-2 font-medium mb-2">
                     <AlertTriangle className="h-4 w-4" />
-                    {result.errors.length} linha{result.errors.length !== 1 ? 's' : ''} ignorada{result.errors.length !== 1 ? 's' : ''}
-                    {result.inserted > 0 && ` (${result.inserted + result.errors.length} linhas lidas no total)`}:
+                    {result.errors.length} linha{result.errors.length !== 1 ? 's' : ''} ignorada{result.errors.length !== 1 ? 's' : ''}:
                   </div>
                   <ul className="list-disc list-inside space-y-0.5 text-xs max-h-40 overflow-y-auto pr-1">
                     {result.errors.map((e, i) => <li key={i}>{e.message}</li>)}

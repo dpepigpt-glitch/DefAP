@@ -279,21 +279,35 @@ export async function importarTarefas(
   const inserted: string[] = []
 
   for (let i = 0; i < rows.length; i++) {
-    const row = rows[i]
+    let row = rows[i]
 
     if (!isValidProcesso(row.numero_processo)) {
       errors.push({ row: i + 1, message: `Linha ${i + 1}: Número de processo inválido` })
       continue
     }
 
+    // data_intimacao fallback: use prazo_final_pje or date part of prazo_interno
     if (!row.data_intimacao) {
-      errors.push({ row: i + 1, message: `Linha ${i + 1}: Data de intimação/expedição ausente` })
-      continue
+      const fallback = row.prazo_final_pje || (row.prazo_interno ? row.prazo_interno.split('T')[0] : '')
+      if (!fallback) {
+        errors.push({ row: i + 1, message: `Linha ${i + 1}: Sem data de expedição nem prazo — linha ignorada` })
+        continue
+      }
+      row = { ...row, data_intimacao: fallback }
     }
 
-    if (!row.prazo_final_pje && !row.prazo_interno) {
-      errors.push({ row: i + 1, message: `Linha ${i + 1}: Prazo final ausente` })
-      continue
+    // prazo_interno must contain a valid date portion
+    if (!row.prazo_interno || row.prazo_interno.startsWith('T')) {
+      if (row.prazo_final_pje) {
+        row = { ...row, prazo_interno: row.prazo_final_pje + 'T17:00:00' }
+      } else {
+        errors.push({ row: i + 1, message: `Linha ${i + 1}: Prazo final ausente — linha ignorada` })
+        continue
+      }
+    }
+
+    if (!row.prazo_final_pje) {
+      row = { ...row, prazo_final_pje: row.prazo_interno.split('T')[0] }
     }
 
     const now = new Date().toISOString()
