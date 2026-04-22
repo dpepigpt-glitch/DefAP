@@ -29,41 +29,33 @@ import {
 const COLUMN_MAP: Record<string, string> = {
   // Processo
   'processo': 'numero_processo',
-  'número do processo': 'numero_processo',
   'numero do processo': 'numero_processo',
   'n processo': 'numero_processo',
-  'nº processo': 'numero_processo',
+  'n° processo': 'numero_processo',
+  'no processo': 'numero_processo',
   // Assistido / Acusado
   'assistido': 'assistido',
   'nome': 'assistido',
   'nome do acusado': 'assistido',
   'acusado': 'assistido',
-  'réu': 'assistido',
   'reu': 'assistido',
   // Data da intimação / expedição
   'data do ciente': 'data_intimacao',
   'ciente': 'data_intimacao',
-  'data intimação': 'data_intimacao',
   'data intimacao': 'data_intimacao',
-  'data de intimação': 'data_intimacao',
   'data de intimacao': 'data_intimacao',
-  'expedição': 'data_intimacao',
   'expedicao': 'data_intimacao',
-  'data de expedição': 'data_intimacao',
+  'data expedicao': 'data_intimacao',
   'data de expedicao': 'data_intimacao',
   // Início
-  'início': 'inicio',
   'inicio': 'inicio',
   // Tipo de petição / providência
-  'petição': 'tipo_peticao_nome',
   'peticao': 'tipo_peticao_nome',
-  'tipo de petição': 'tipo_peticao_nome',
   'tipo de peticao': 'tipo_peticao_nome',
-  'tipo petição': 'tipo_peticao_nome',
   'tipo peticao': 'tipo_peticao_nome',
   'tipo': 'tipo_peticao_nome',
-  'providência': 'tipo_peticao_nome',
   'providencia': 'tipo_peticao_nome',
+  'providencias': 'tipo_peticao_nome',
   'ato': 'tipo_peticao_nome',
   // Prazo em dias
   'prazo': 'prazo_dias',
@@ -75,8 +67,9 @@ const COLUMN_MAP: Record<string, string> = {
   'data final do prazo': 'prazo_final_pje',
   'final': 'prazo_final_pje',
   'expressa': 'prazo_final_pje',
-  // Prazo interno / P.D. termina em
+  // Prazo interno / P.D. termina em / Prazo do estagiário
   'prazo interno': 'prazo_interno',
+  'prazo do estagiario': 'prazo_interno',
   'p. d. termina em': 'prazo_interno',
   'p. d. termina em:': 'prazo_interno',
   'p.d. termina em': 'prazo_interno',
@@ -87,11 +80,24 @@ const COLUMN_MAP: Record<string, string> = {
   'termina em': 'prazo_interno',
   // Executor
   'executor': 'executor_nome',
-  'responsável': 'executor_nome',
   'responsavel': 'executor_nome',
   // Status
   'protocolo': 'status_raw',
   'status': 'status_raw',
+}
+
+/**
+ * Normalize a column header for COLUMN_MAP lookup.
+ * Strips Unicode combining diacritics (NFD decomposition) so that
+ * "PROVIDÊNCIA" (from Excel) matches "providencia" in the map
+ * regardless of NFC/NFD form or encoding differences.
+ */
+function normalizeHeader(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim()
 }
 
 const PETICAO_NORMALIZE: Record<string, string> = {
@@ -204,7 +210,7 @@ export function ImportClient({ unidadeId, profiles, tiposTarefa }: ImportClientP
       const parsed = Papa.parse<string[]>(text, { skipEmptyLines: true })
       const rawData = parsed.data as string[][]
       if (rawData.length < 2) return { rows: [], hdrs: [] }
-      const hdrs = rawData[0].map((h) => h.toLowerCase().trim())
+      const hdrs = rawData[0].map((h) => normalizeHeader(h))
       const rows = rawData.slice(1).map((row) => {
         const obj: ParsedRow = {}
         hdrs.forEach((h, i) => { obj[h] = row[i] ?? '' })
@@ -227,18 +233,18 @@ export function ImportClient({ unidadeId, profiles, tiposTarefa }: ImportClientP
 
         // Find the real header row — some tabs have a title row before the column headers.
         // Search up to row 5 for the first row that contains a recognised column identifier.
-        const KEY_IDENTIFIERS = ['processo', 'assistido', 'nome', 'acusado', 'expedição', 'expedicao']
+        const KEY_IDENTIFIERS = ['processo', 'assistido', 'nome', 'acusado', 'expedicao']
         let headerRowIdx = -1
         for (let r = 0; r < Math.min(data.length, 6); r++) {
           const hasKey = (data[r] as unknown[]).some((cell) => {
-            const s = cellToString(cell).toLowerCase().trim()
+            const s = normalizeHeader(cellToString(cell))
             return KEY_IDENTIFIERS.some((k) => s === k || s.includes('processo'))
           })
           if (hasKey) { headerRowIdx = r; break }
         }
         if (headerRowIdx === -1) continue // no header found in this sheet
 
-        const sheetHdrs = (data[headerRowIdx] as unknown[]).map((h) => cellToString(h).toLowerCase().trim())
+        const sheetHdrs = (data[headerRowIdx] as unknown[]).map((h) => normalizeHeader(cellToString(h)))
         if (firstHdrs.length === 0) firstHdrs = sheetHdrs
 
         const sheetRows = data.slice(headerRowIdx + 1).map((row) => {
@@ -270,7 +276,7 @@ export function ImportClient({ unidadeId, profiles, tiposTarefa }: ImportClientP
 
       rows.forEach((row) => {
         Object.entries(row).forEach(([key, val]) => {
-          const mk = COLUMN_MAP[key.toLowerCase().trim()]
+          const mk = COLUMN_MAP[normalizeHeader(key)]
           if (mk === 'executor_nome') {
             execNames.add(val && val.trim() ? val.trim() : 'Estagiário não Informado')
           }
@@ -304,7 +310,7 @@ export function ImportClient({ unidadeId, profiles, tiposTarefa }: ImportClientP
   ): Omit<TarefaPayload, 'unidade_id'> {
     const mapped: Record<string, string> = {}
     Object.entries(row).forEach(([key, val]) => {
-      const mk = COLUMN_MAP[key.toLowerCase().trim()]
+      const mk = COLUMN_MAP[normalizeHeader(key)]
       if (mk) mapped[mk] = val
     })
 
@@ -363,7 +369,7 @@ export function ImportClient({ unidadeId, profiles, tiposTarefa }: ImportClientP
         .filter((row) => {
           const mapped: Record<string, string> = {}
           Object.entries(row).forEach(([k, v]) => {
-            const mk = COLUMN_MAP[k.toLowerCase().trim()]
+            const mk = COLUMN_MAP[normalizeHeader(k)]
             if (mk) mapped[mk] = v
           })
           return (mapped.numero_processo ?? '').trim() !== ''
