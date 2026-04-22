@@ -54,6 +54,7 @@ export function TarefaForm({
     prazo_final_pje: tarefa ? isoToDisplay(tarefa.prazo_final_pje) : '',
     prazo_interno: tarefa ? isoToDisplay(tarefa.prazo_interno.split('T')[0]) : '',
     executor_id: tarefa?.executor_id ?? '',
+    reu_preso: tarefa?.reu_preso ?? false,
   })
 
   const [valoresCustomizados, setValoresCustomizados] = useState<Record<string, string>>(
@@ -92,7 +93,7 @@ export function TarefaForm({
 
   function handleTextBlur(field: keyof typeof formData) {
     return () => {
-      setFormData((prev) => ({ ...prev, [field]: toTitleCase(prev[field]) }))
+      setFormData((prev) => ({ ...prev, [field]: toTitleCase(prev[field] as string) }))
     }
   }
 
@@ -112,6 +113,7 @@ export function TarefaForm({
       prazo_final_pje: dateToISO(formData.prazo_final_pje),
       prazo_interno: dateToISO(formData.prazo_interno) + 'T17:00:00',
       executor_id: formData.executor_id || undefined,
+      reu_preso: formData.reu_preso,
       valores_customizados: valoresCustomizados,
     }
 
@@ -310,6 +312,30 @@ export function TarefaForm({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            {/* Réu Preso */}
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setFormData((p) => ({ ...p, reu_preso: !p.reu_preso }))}
+                className={`w-full flex items-center justify-between rounded-lg border px-4 py-3 text-sm font-medium transition-colors ${
+                  formData.reu_preso
+                    ? 'bg-green-700 border-green-800 text-white'
+                    : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <span className="text-base">{formData.reu_preso ? '🔒' : '🔓'}</span>
+                  Réu Preso
+                </span>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                  formData.reu_preso
+                    ? 'bg-white/20 text-white'
+                    : 'bg-gray-100 text-gray-500'
+                }`}>
+                  {formData.reu_preso ? 'SIM' : 'NÃO'}
+                </span>
+              </button>
             </div>
           </CardContent>
         </Card>

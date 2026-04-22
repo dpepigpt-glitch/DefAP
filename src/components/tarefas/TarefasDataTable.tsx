@@ -170,7 +170,14 @@ export function TarefasDataTable({
         accessorKey: 'assistido',
         header: ({ column }) => <SortableHeader column={column} label="Assistido" />,
         cell: ({ row }) => (
-          <span className="font-medium text-gray-900">{row.original.assistido}</span>
+          <span className="font-medium text-gray-900 flex items-center gap-1.5">
+            {row.original.reu_preso && (
+              <span className="text-xs font-bold text-white bg-green-700 px-1.5 py-0.5 rounded shrink-0" title="Réu Preso">
+                R.P.
+              </span>
+            )}
+            {row.original.assistido}
+          </span>
         ),
       },
       tipo_tarefa: {

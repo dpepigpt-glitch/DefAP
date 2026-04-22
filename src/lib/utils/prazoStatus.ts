@@ -49,11 +49,21 @@ export const URGENCY_ROW_CLASS: Record<UrgencyLevel, string> = {
   protocolado: 'bg-gray-100 hover:bg-gray-150 opacity-70 transition-colors',
 }
 
+// Réu preso variants — darker / more prominent for tasks still within deadline
+const REU_PRESO_ROW_CLASS: Partial<Record<UrgencyLevel, string>> = {
+  onTime:     'bg-green-200 hover:bg-green-300 border-l-4 border-green-700 transition-colors',
+  warning24h: 'bg-orange-100 hover:bg-orange-200 border-l-4 border-orange-600 font-semibold transition-colors',
+}
+
 /**
- * Returns the row CSS class for a given tarefa.
+ * Returns the row CSS class for a given tarefa, accounting for réu preso flag.
  */
 export function getRowClass(tarefa: Tarefa): string {
-  return URGENCY_ROW_CLASS[getUrgencyLevel(tarefa)]
+  const level = getUrgencyLevel(tarefa)
+  if (tarefa.reu_preso && REU_PRESO_ROW_CLASS[level]) {
+    return REU_PRESO_ROW_CLASS[level]!
+  }
+  return URGENCY_ROW_CLASS[level]
 }
 
 /**

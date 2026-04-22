@@ -76,6 +76,7 @@ export interface Tarefa {
   remetido_at: string | null
   protocolado_at: string | null
   protocolado_by: string | null
+  reu_preso: boolean
   // Joined fields
   executor?: Profile
   tipo_tarefa?: TipoTarefa
