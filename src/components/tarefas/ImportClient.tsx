@@ -27,21 +27,34 @@ import {
 } from 'lucide-react'
 
 const COLUMN_MAP: Record<string, string> = {
+  // Processo
   'processo': 'numero_processo',
   'número do processo': 'numero_processo',
   'numero do processo': 'numero_processo',
   'n processo': 'numero_processo',
   'nº processo': 'numero_processo',
+  // Assistido / Acusado
   'assistido': 'assistido',
   'nome': 'assistido',
+  'nome do acusado': 'assistido',
+  'acusado': 'assistido',
+  'réu': 'assistido',
+  'reu': 'assistido',
+  // Data da intimação / expedição
   'data do ciente': 'data_intimacao',
   'ciente': 'data_intimacao',
   'data intimação': 'data_intimacao',
   'data intimacao': 'data_intimacao',
   'data de intimação': 'data_intimacao',
   'data de intimacao': 'data_intimacao',
+  'expedição': 'data_intimacao',
+  'expedicao': 'data_intimacao',
+  'data de expedição': 'data_intimacao',
+  'data de expedicao': 'data_intimacao',
+  // Início
   'início': 'inicio',
   'inicio': 'inicio',
+  // Tipo de petição / providência
   'petição': 'tipo_peticao_nome',
   'peticao': 'tipo_peticao_nome',
   'tipo de petição': 'tipo_peticao_nome',
@@ -49,17 +62,34 @@ const COLUMN_MAP: Record<string, string> = {
   'tipo petição': 'tipo_peticao_nome',
   'tipo peticao': 'tipo_peticao_nome',
   'tipo': 'tipo_peticao_nome',
+  'providência': 'tipo_peticao_nome',
+  'providencia': 'tipo_peticao_nome',
+  'ato': 'tipo_peticao_nome',
+  // Prazo em dias
   'prazo': 'prazo_dias',
+  // Prazo final PJE / expressa
   'prazo final pje': 'prazo_final_pje',
   'prazo pje': 'prazo_final_pje',
   'final do prazo': 'prazo_final_pje',
   'data da final do prazo': 'prazo_final_pje',
   'data final do prazo': 'prazo_final_pje',
   'final': 'prazo_final_pje',
+  'expressa': 'prazo_final_pje',
+  // Prazo interno / P.D. termina em
+  'prazo interno': 'prazo_interno',
+  'p. d. termina em': 'prazo_interno',
+  'p. d. termina em:': 'prazo_interno',
+  'p.d. termina em': 'prazo_interno',
+  'p.d. termina em:': 'prazo_interno',
+  'pd termina em': 'prazo_interno',
+  'prazo definitivo': 'prazo_interno',
+  'prazo definitivo termina em': 'prazo_interno',
+  'termina em': 'prazo_interno',
+  // Executor
   'executor': 'executor_nome',
   'responsável': 'executor_nome',
   'responsavel': 'executor_nome',
-  'prazo interno': 'prazo_interno',
+  // Status
   'protocolo': 'status_raw',
   'status': 'status_raw',
 }
@@ -185,16 +215,29 @@ export function ImportClient({ unidadeId, profiles, tiposTarefa }: ImportClientP
       const XLSX = await import('xlsx')
       const buffer = await file.arrayBuffer()
       const workbook = XLSX.read(buffer, { cellDates: true })
-      const sheet = workbook.Sheets[workbook.SheetNames[0]]
-      const data = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1 }) as unknown[][]
-      if (data.length < 2) return { rows: [], hdrs: [] }
-      const hdrs = (data[0] as unknown[]).map((h) => cellToString(h).toLowerCase().trim())
-      const rows = data.slice(1).map((row) => {
-        const obj: ParsedRow = {}
-        hdrs.forEach((h, i) => { obj[h] = cellToString((row as unknown[])[i]) })
-        return obj
-      })
-      return { rows, hdrs }
+
+      // Read ALL sheets and combine rows (supports multi-tab files, e.g. one tab per month)
+      const allRows: ParsedRow[] = []
+      let firstHdrs: string[] = []
+
+      for (const sheetName of workbook.SheetNames) {
+        const sheet = workbook.Sheets[sheetName]
+        const data = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1 }) as unknown[][]
+        if (data.length < 2) continue
+        const sheetHdrs = (data[0] as unknown[]).map((h) => cellToString(h).toLowerCase().trim())
+        if (firstHdrs.length === 0) firstHdrs = sheetHdrs
+
+        const sheetRows = data.slice(1).map((row) => {
+          const obj: ParsedRow = {}
+          sheetHdrs.forEach((h, i) => { obj[h] = cellToString((row as unknown[])[i]) })
+          return obj
+        }).filter((row) => Object.values(row).some((v) => v.trim() !== ''))
+
+        allRows.push(...sheetRows)
+      }
+
+      if (firstHdrs.length === 0) return { rows: [], hdrs: [] }
+      return { rows: allRows, hdrs: firstHdrs }
     }
   }
 

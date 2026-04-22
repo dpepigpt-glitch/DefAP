@@ -286,6 +286,16 @@ export async function importarTarefas(
       continue
     }
 
+    if (!row.data_intimacao) {
+      errors.push({ row: i + 1, message: `Linha ${i + 1}: Data de intimação/expedição ausente` })
+      continue
+    }
+
+    if (!row.prazo_final_pje && !row.prazo_interno) {
+      errors.push({ row: i + 1, message: `Linha ${i + 1}: Prazo final ausente` })
+      continue
+    }
+
     const now = new Date().toISOString()
     const { data: tarefa, error } = await supabase
       .from('tarefas')
