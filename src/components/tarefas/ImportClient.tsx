@@ -232,15 +232,17 @@ export function ImportClient({ unidadeId, profiles, tiposTarefa }: ImportClientP
         if (data.length < 2) continue
 
         // Find the real header row — some tabs have a title row before the column headers.
-        // Search up to row 5 for the first row that contains a recognised column identifier.
-        const KEY_IDENTIFIERS = ['processo', 'assistido', 'nome', 'acusado', 'expedicao']
+        // Use COLUMN_MAP matching: the header row is the first row where ≥2 cells are
+        // known column names, or exactly 1 cell is 'processo'. Title rows (e.g.
+        // "CONTROLE DE PROCESSOS - FEVEREIRO") won't have 2+ COLUMN_MAP matches.
         let headerRowIdx = -1
-        for (let r = 0; r < Math.min(data.length, 6); r++) {
-          const hasKey = (data[r] as unknown[]).some((cell) => {
-            const s = normalizeHeader(cellToString(cell))
-            return KEY_IDENTIFIERS.some((k) => s === k || s.includes('processo'))
-          })
-          if (hasKey) { headerRowIdx = r; break }
+        for (let r = 0; r < Math.min(data.length, 10); r++) {
+          const cells = (data[r] as unknown[]).map((cell) => normalizeHeader(cellToString(cell)))
+          const knownCount = cells.filter((s) => s && COLUMN_MAP[s] !== undefined).length
+          if (knownCount >= 2 || cells.includes('processo')) {
+            headerRowIdx = r
+            break
+          }
         }
         if (headerRowIdx === -1) continue // no header found in this sheet
 
@@ -324,10 +326,10 @@ export function ImportClient({ unidadeId, profiles, tiposTarefa }: ImportClientP
 
     const prazoFinalISO = dateToISO(prazoFinalStr)
     const inicioISO = dateToISO(inicioStr)
-    const dataIntimacaoISO =
-      dateToISO(cellToDateString(mapped.data_intimacao ?? '')) || inicioISO || prazoFinalISO
     const prazoInternoISO =
       dateToISO(cellToDateString(mapped.prazo_interno ?? '')) || prazoFinalISO
+    const dataIntimacaoISO =
+      dateToISO(cellToDateString(mapped.data_intimacao ?? '')) || inicioISO || prazoFinalISO || prazoInternoISO
 
     const payload: Omit<TarefaPayload, 'unidade_id'> = {
       numero_processo: maskProcesso(mapped.numero_processo ?? ''),
