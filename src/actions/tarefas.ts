@@ -46,7 +46,7 @@ export async function createTarefa(payload: TarefaPayload) {
 
   if (error) {
     console.error('[createTarefa]', error.message, error.details)
-    return { error: 'Erro ao criar tarefa.' }
+    return { error: `Erro ao criar tarefa: ${error.message}` }
   }
 
   if (valores_customizados && Object.keys(valores_customizados).length > 0) {
