@@ -32,11 +32,12 @@ export default async function RelatoriosPage({ params }: PageProps) {
     .eq('id', unidadeId)
     .single()
 
-  // Get all remetidas + protocoladas tasks
+  // Get all remetidas + protocoladas tasks created in the system (excludes imported tasks)
   const { data: tarefas } = await supabase
     .from('tarefas')
     .select('*, executor:profiles!executor_id(id, full_name, email)')
     .eq('unidade_id', unidadeId)
+    .eq('origem', 'sistema')
     .in('status', ['remetido_ao_defensor', 'protocolado'])
 
   const typedTarefas = (tarefas ?? []) as unknown as Tarefa[]
@@ -109,7 +110,7 @@ export default async function RelatoriosPage({ params }: PageProps) {
                 </p>
                 <p className="text-sm text-gray-600">{SELO_DESCRIPTION[seloGeral]}</p>
                 <p className="text-xs text-gray-400 mt-1">
-                  Baseado em {typedTarefas.length} tarefa{typedTarefas.length !== 1 ? 's' : ''} concluída{typedTarefas.length !== 1 ? 's' : ''}
+                  Baseado em {typedTarefas.length} tarefa{typedTarefas.length !== 1 ? 's' : ''} concluída{typedTarefas.length !== 1 ? 's' : ''} criada{typedTarefas.length !== 1 ? 's' : ''} no sistema
                 </p>
               </div>
             </div>

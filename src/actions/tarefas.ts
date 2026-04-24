@@ -39,11 +39,15 @@ export async function createTarefa(payload: TarefaPayload) {
       ...tarefaData,
       assistido: toTitleCase(payload.assistido),
       created_by: user.id,
+      origem: 'sistema',
     })
     .select()
     .single()
 
-  if (error) return { error: 'Erro ao criar tarefa.' }
+  if (error) {
+    console.error('[createTarefa]', error.message, error.details)
+    return { error: 'Erro ao criar tarefa.' }
+  }
 
   if (valores_customizados && Object.keys(valores_customizados).length > 0) {
     const valores = Object.entries(valores_customizados)
@@ -319,6 +323,7 @@ export async function importarTarefas(
         unidade_id: unidadeId,
         assistido: toTitleCase(row.assistido),
         created_by: user.id,
+        origem: 'importacao',
         ...(row.status === 'protocolado'
           ? { protocolado_at: row.prazo_interno, protocolado_by: user.id }
           : {}),

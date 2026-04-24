@@ -77,6 +77,7 @@ export interface Tarefa {
   protocolado_at: string | null
   protocolado_by: string | null
   reu_preso: boolean
+  origem: 'sistema' | 'importacao'
   // Joined fields
   executor?: Profile
   tipo_tarefa?: TipoTarefa
