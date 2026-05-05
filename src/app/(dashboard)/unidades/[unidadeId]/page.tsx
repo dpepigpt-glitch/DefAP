@@ -35,7 +35,7 @@ export default async function UnidadePage({ params }: PageProps) {
       valores_customizados:tarefa_valores_customizados(*)
     `)
     .eq('unidade_id', unidadeId)
-    .order('prazo_interno', { ascending: true })
+    .order('created_at', { ascending: true })
 
   if (role === 'executor') {
     tarefasQuery = tarefasQuery.eq('executor_id', user.id)

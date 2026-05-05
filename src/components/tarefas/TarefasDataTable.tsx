@@ -12,6 +12,7 @@ import {
   type SortingState,
   type ColumnFiltersState,
   type ColumnDef,
+  type VisibilityState,
 } from '@tanstack/react-table'
 import { ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Pencil, Trash2, CheckSquare, RotateCcw } from 'lucide-react'
 import type { Tarefa, ColunaCustomizada } from '@/types'
@@ -79,8 +80,9 @@ export function TarefasDataTable({
   columnFilters = [],
 }: TarefasDataTableProps) {
   const [sorting, setSorting] = useState<SortingState>([
-    { id: 'prazo_interno', desc: false }, // Default: earliest deadline first
+    { id: 'created_at', desc: false }, // Default: oldest task first (creation order)
   ])
+  const [columnVisibility] = useState<VisibilityState>({ created_at: false })
   const [internalColumnFilters, setInternalColumnFilters] =
     useState<ColumnFiltersState>(columnFilters)
   const [internalGlobalFilter, setInternalGlobalFilter] = useState(globalFilter)
@@ -250,6 +252,15 @@ export function TarefasDataTable({
       },
     }
 
+    // Hidden sort column — not shown in UI but enables default creation-order sort
+    const createdAtCol: ColumnDef<Tarefa> = {
+      id: 'created_at',
+      accessorKey: 'created_at',
+      enableHiding: true,
+      header: () => null,
+      cell: () => null,
+    }
+
     // Build ordered column list from layout
     const activeCustomColunas = colunas.filter((c) => c.ativo)
     const effectiveLayout = buildEffectiveLayout(
@@ -257,7 +268,7 @@ export function TarefasDataTable({
       activeCustomColunas.sort((a, b) => a.ordem - b.ordem).map((c) => c.id)
     )
 
-    const orderedColumns: ColumnDef<Tarefa>[] = []
+    const orderedColumns: ColumnDef<Tarefa>[] = [createdAtCol]
     for (const key of effectiveLayout) {
       if (isDefaultColumnKey(key)) {
         if (defaultColDefs[key]) orderedColumns.push(defaultColDefs[key])
@@ -412,6 +423,7 @@ export function TarefasDataTable({
       sorting,
       columnFilters: internalColumnFilters,
       globalFilter: internalGlobalFilter,
+      columnVisibility,
     },
     onSortingChange: setSorting,
     onColumnFiltersChange: setInternalColumnFilters,

@@ -2,7 +2,7 @@
 
 import { countByUrgency } from '@/lib/utils/prazoStatus'
 import type { Tarefa, Unidade, TarefaStatus } from '@/types'
-import { AlertTriangle, Clock, CheckCircle2, Send, Building2, Archive } from 'lucide-react'
+import { AlertTriangle, Clock, CheckCircle2, Send, Building2, Archive, Eye, EyeOff } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 
 type FilterValue = TarefaStatus | 'warning24h' | 'overdue'
@@ -11,7 +11,11 @@ interface UnidadePageHeaderProps {
   unidade: Unidade
   tarefas: Tarefa[]
   activeFilter?: FilterValue | null
+  showProtocoladas: boolean
+  protocoladasCount: number
   onFilterClick?: (filter: FilterValue) => void
+  onShowAll: () => void
+  onHideProtocoladas: () => void
 }
 
 interface CardProps {
@@ -45,8 +49,18 @@ function SummaryCard({ count, label, filterKey, colorClasses, icon, activeFilter
   )
 }
 
-export function UnidadePageHeader({ unidade, tarefas, activeFilter, onFilterClick }: UnidadePageHeaderProps) {
+export function UnidadePageHeader({
+  unidade,
+  tarefas,
+  activeFilter,
+  showProtocoladas,
+  protocoladasCount,
+  onFilterClick,
+  onShowAll,
+  onHideProtocoladas,
+}: UnidadePageHeaderProps) {
   const counts = countByUrgency(tarefas)
+  const activeTarefas = tarefas.filter((t) => t.status !== 'protocolado')
 
   return (
     <div>
@@ -57,7 +71,7 @@ export function UnidadePageHeader({ unidade, tarefas, activeFilter, onFilterClic
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{unidade.nome}</h1>
           <p className="text-gray-500 text-sm">
-            {tarefas.length} tarefa{tarefas.length !== 1 ? 's' : ''} · clique num card para filtrar
+            {activeTarefas.length} ativa{activeTarefas.length !== 1 ? 's' : ''} · {protocoladasCount} protocolada{protocoladasCount !== 1 ? 's' : ''} · clique num card para filtrar
           </p>
         </div>
       </div>
@@ -108,6 +122,32 @@ export function UnidadePageHeader({ unidade, tarefas, activeFilter, onFilterClic
           activeFilter={activeFilter}
           onFilterClick={onFilterClick}
         />
+      </div>
+
+      {/* Show all / hide protocoladas toggle */}
+      <div className="mt-3 flex items-center gap-2">
+        {!showProtocoladas ? (
+          <button
+            onClick={onShowAll}
+            className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800 transition-colors border border-gray-200 rounded-md px-3 py-1.5 bg-white hover:bg-gray-50"
+          >
+            <Eye className="h-3.5 w-3.5" />
+            Ver todas (inclui {protocoladasCount} protocolada{protocoladasCount !== 1 ? 's' : ''})
+          </button>
+        ) : (
+          <button
+            onClick={onHideProtocoladas}
+            className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800 transition-colors border border-gray-200 rounded-md px-3 py-1.5 bg-white hover:bg-gray-50"
+          >
+            <EyeOff className="h-3.5 w-3.5" />
+            Ocultar protocoladas
+          </button>
+        )}
+        {activeFilter && (
+          <span className="text-xs text-gray-400">
+            filtro ativo — clique no card novamente para remover
+          </span>
+        )}
       </div>
     </div>
   )
